@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import logoUfc from '../assets/logo-ufc.png';
@@ -12,6 +13,8 @@ function NotificationBell() {
   const { t } = useLanguage();
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
   const dropdownRef = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -45,13 +48,35 @@ function NotificationBell() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000); // Poll every 15 seconds
+    const interval = setInterval(fetchNotifications, 15000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 320; // w-80 = 320px
+      let leftPos = rect.left;
+      
+      // Prevent dropdown from overflowing past the right edge of the window
+      if (leftPos + dropdownWidth > window.innerWidth - 20) {
+        leftPos = window.innerWidth - dropdownWidth - 20;
+      }
+
+      setCoords({
+        top: rect.bottom + 8,
+        left: leftPos,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -62,9 +87,10 @@ function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.estLue).length;
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={handleToggle}
         className="relative bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 p-2.5 rounded-2xl transition-all shadow-sm hover:shadow cursor-pointer flex items-center justify-center"
         type="button"
         aria-label="Notifications"
@@ -90,8 +116,12 @@ function NotificationBell() {
         )}
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 rtl:left-0 rtl:right-auto mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+      {isOpen && createPortal(
+        <div 
+          ref={dropdownRef}
+          style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
+          className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[99999] overflow-hidden"
+        >
           <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-800 text-sm">{t('notifications')}</h3>
             {unreadCount > 0 && (
@@ -129,7 +159,8 @@ function NotificationBell() {
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

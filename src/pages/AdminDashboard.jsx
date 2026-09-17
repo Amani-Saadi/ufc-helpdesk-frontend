@@ -55,7 +55,7 @@ function NotificationBell() {
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setCoords({
-        top: rect.top - 6, // Positioned much closer right above the button
+        top: rect.top - 6,
         right: window.innerWidth - rect.right,
       });
     }
@@ -224,10 +224,8 @@ export default function AdminDashboard() {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-    // Default open for admin visibility
     const [showUserManagement, setShowUserManagement] = useState(true);
 
-    // State for modal & comments
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [ticketComments, setTicketComments] = useState([]);
     const [newComment, setNewComment] = useState('');
@@ -306,7 +304,6 @@ export default function AdminDashboard() {
         };
     }, [fetchData]);
 
-    // Fetch comments when a ticket is selected
     useEffect(() => {
         if (!selectedTicket?.id) {
             setTicketComments([]);
@@ -405,7 +402,6 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Controls */}
                     <div className="flex items-center gap-3">
                         <NotificationBell />
                         <LanguageSwitcher />
@@ -473,38 +469,41 @@ export default function AdminDashboard() {
                                         <th className="p-4">{t('email') || 'Email'}</th>
                                         <th className="p-4">{t('role') || 'Rôle'}</th>
                                         <th className="p-4">{t('status') || 'Statut'}</th>
-                                        <th className="p-4 text-right">{t('actions')}</th>
+                                        <th className="p-4 text-right">{t('actions') || 'Activer / Désactiver'}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm">
-                                    {users.map(u => (
-                                        <tr key={u.id} className="hover:bg-purple-50/20 transition-colors">
-                                            <td className="p-4 font-semibold text-gray-900">{u.nom} {u.prenom}</td>
-                                            <td className="p-4 text-gray-600">{u.email}</td>
-                                            <td className="p-4">
-                                                <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 border border-blue-200/50">
-                                                    {t(u.role?.toUpperCase()) || u.role}
-                                                </span>
-                                            </td>
-                                            <td className="p-4">
-                                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg inline-block ${u.statutActif !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                                                    {u.statutActif !== false ? (t('active') || 'Actif') : (t('deactivated') || 'Désactivé')}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                <button
-                                                    onClick={() => handleToggleDeactivateUser(u.id)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                                                        u.statutActif !== false
-                                                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                                                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
-                                                    }`}
-                                                >
-                                                    {u.statutActif !== false ? (t('deactivate') || 'Désactiver') : (t('activate') || 'Activer')}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {users.map(u => {
+                                        const isActive = u.statutActif !== false;
+                                        return (
+                                            <tr key={u.id} className="hover:bg-purple-50/25 transition-colors">
+                                                <td className="p-4 font-semibold text-gray-900">{u.nom} {u.prenom}</td>
+                                                <td className="p-4 text-gray-600">{u.email}</td>
+                                                <td className="p-4">
+                                                    <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 border border-blue-200/50">
+                                                        {t(u.role?.toUpperCase()) || u.role}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg inline-block ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                                        {isActive ? (t('active') || 'Actif') : (t('deactivated') || 'Désactivé')}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {/* CUSTOM TOGGLE SWITCH */}
+                                                    <label className="relative inline-flex items-center cursor-pointer select-none justify-end">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={isActive}
+                                                            onChange={() => handleToggleDeactivateUser(u.id)}
+                                                            className="sr-only peer" 
+                                                        />
+                                                        <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
+                                                    </label>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     {users.length === 0 && (
                                         <tr>
                                             <td colSpan="5" className="p-8 text-center text-gray-400 text-sm">
