@@ -6,7 +6,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function Login() {
-    const { t } = useLanguage(); // <--- Enables instant re-render on language change
+    const { t } = useLanguage(); 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -21,13 +21,23 @@ export default function Login() {
             });
 
             const { token, user } = response.data;
+            
+            // Debug logs to verify what the backend is sending back
+            console.log("FULL USER OBJECT RECEIVED:", user);
+            console.log("DETECTED ROLE:", user?.role);
+
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
 
-            if (user.role === 'EMPLOYE') {
+            // Normalize the role string to handle database roles safely
+            const role = user?.role?.toUpperCase();
+
+            if (role === 'EMPLOYE') {
                 navigate('/employee');
-            } else if (user.role === 'TECHNICIEN_IT') {
+            } else if (role === 'TECHNICIEN_IT') {
                 navigate('/technician');
+            } else if (role === 'ADMIN' || role === 'ADMINISTRATEUR') {
+                navigate('/admin');
             } else {
                 navigate('/employee');
             }
@@ -77,6 +87,7 @@ export default function Login() {
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">{t('emailAddress')}</label>
                         <input
                             type="email"
+                            autoComplete="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -90,6 +101,7 @@ export default function Login() {
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">{t('password')}</label>
                         <input
                             type="password"
+                            autoComplete="current-password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required

@@ -1,9 +1,164 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import logoUfc from '../assets/logo-ufc.png';
 import { useLanguage } from '../hooks/useLanguage';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+
+// ==========================================
+// EMBEDDED NOTIFICATION BELL & HOOK
+// ==========================================
+function NotificationBell() {
+  const { t } = useLanguage();
+  const [notifications, setNotifications] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, right: 0 });
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications');
+      if (res.data?.status === 'success' || Array.isArray(res.data?.data) || Array.isArray(res.data)) {
+        setNotifications(res.data.data || res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  }, []);
+
+  const markAsRead = async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, estLue: true } : n));
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifications(prev => prev.map(n => ({ ...n, estLue: true })));
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.top - 6, // Positioned much closer right above the button
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.estLue).length;
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="relative bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 p-2.5 rounded-2xl transition-all shadow-sm hover:shadow cursor-pointer flex items-center justify-center"
+        type="button"
+        aria-label="Notifications"
+      >
+        <svg
+          className="w-5 h-5 text-gray-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div 
+          ref={dropdownRef}
+          style={{
+            top: `${coords.top}px`,
+            right: `${coords.right}px`,
+            transform: 'translateY(-100%)'
+          }}
+          className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[9999] overflow-hidden"
+        >
+          <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 text-sm">{t('notifications')}</h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+              >
+                Tout marquer comme lu
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+            {notifications.length === 0 ? (
+              <div className="p-6 text-center text-gray-400 text-sm">
+                Aucune notification
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => !n.estLue && markAsRead(n.id)}
+                  className={`p-3 text-xs cursor-pointer transition-colors ${
+                    n.estLue ? 'bg-white hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-50 font-medium'
+                  }`}
+                >
+                  <p className="text-gray-800">{n.message}</p>
+                  <span className="text-[10px] text-gray-400 mt-1 block">
+                    {new Date(n.dateEnvoi || n.createdAt || Date.now()).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getStatusBadge = (statut) => {
     switch (statut) {
@@ -37,67 +192,116 @@ const getPriorityBadge = (priorite) => {
     }
 };
 
+const getCategoryKey = (categorie) => {
+    if (!categorie) return 'UNCATEGORIZED';
+    const raw = typeof categorie === 'object' ? (categorie.nom || categorie.libelle || categorie.titre || categorie.name || '') : categorie;
+    const name = String(raw).trim().toUpperCase();
+    
+    if (name.includes('MAINTENANCE')) return 'MAINTENANCE';
+    if (name.includes('RESEAU') || name.includes('RÉSEAU') || name.includes('NETWORK')) return 'RESEAU';
+    if (name.includes('SITE') || name.includes('WEB') || name.includes('SITE_WEB')) return 'SITE_WEB';
+    if (name.includes('TECH')) return 'TECH';
+    return name;
+};
+
 const getCategoryBadge = (categorie) => {
-    const name = (typeof categorie === 'object' ? (categorie?.nom || categorie?.libelle || '') : categorie).toUpperCase();
-    if (name.includes('MAINTENANCE')) {
-        return 'bg-amber-50 text-amber-800 border border-amber-200/50';
-    }
-    if (name.includes('RESEAU') || name.includes('NETWORK')) {
-        return 'bg-blue-50 text-blue-800 border border-blue-200/50';
-    }
-    if (name.includes('SITE') || name.includes('WEB')) {
-        return 'bg-emerald-50 text-emerald-800 border border-emerald-200/50';
-    }
+    const key = getCategoryKey(categorie);
+    if (key === 'MAINTENANCE') return 'bg-amber-50 text-amber-800 border border-amber-200/50';
+    if (key === 'RESEAU') return 'bg-blue-50 text-blue-800 border border-blue-200/50';
+    if (key === 'SITE_WEB') return 'bg-emerald-50 text-emerald-800 border border-emerald-200/50';
+    if (key === 'TECH') return 'bg-purple-50 text-purple-800 border border-purple-200/50';
     return 'bg-slate-50 text-slate-700 border border-slate-200/50';
 };
 
 export default function TechnicianDashboard() {
-    const { t } = useLanguage();
+    const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [departements, setDepartements] = useState([]);
     const [errorMsg, setErrorMsg] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
 
+    // State for modal & comments
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [ticketComments, setTicketComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
+    const [newStatus, setNewStatus] = useState('');
+
     const navigate = useNavigate();
 
-    const getCategoryName = (categorie) => {
-        if (!categorie) return t('uncategorized');
-        let rawCat = categorie;
-        if (typeof categorie === 'object') {
-            rawCat = categorie.nom || categorie.libelle || categorie.titre || 'other';
+    const getCategoryName = useCallback((categorieInput) => {
+        let catObj = categorieInput;
+        
+        if (categorieInput && typeof categorieInput !== 'object') {
+            const found = categories.find(c => String(c.id || c._id) === String(categorieInput));
+            if (found) catObj = found;
         }
-        // Pass through translation function t() so it translates compound keys like "maintenance informatique"
-        return t(rawCat);
-    };
 
-    const getDepartmentName = (ticket) => {
-        const dept = ticket.departement || ticket.service || ticket.employe?.departement || ticket.employe?.service;
-        if (!dept) return '';
-        if (typeof dept === 'object') {
-            return dept.nom || dept.libelle || '';
+        const key = getCategoryKey(catObj);
+        const translated = t(key);
+        return translated !== key ? translated : (typeof catObj === 'object' ? (catObj.nom || catObj.libelle || catObj.name) : catObj);
+    }, [categories, t]);
+
+    const getDepartmentName = useCallback((ticket) => {
+        const deptInput = ticket.departement || ticket.department || ticket.departement_id || ticket.departmentId || ticket.employe?.departement;
+        if (!deptInput) return '';
+
+        let deptObj = deptInput;
+        
+        if (deptInput && typeof deptInput !== 'object') {
+            const found = departements.find(d => String(d.id || d._id) === String(deptInput));
+            if (found) deptObj = found;
         }
-        return dept;
-    };
 
-    const fetchTickets = async () => {
+        const rawName = typeof deptObj === 'object' 
+            ? (deptObj.nom || deptObj.libelle || deptObj.name || deptObj.title || '') 
+            : String(deptObj);
+
+        const trimmedKey = rawName.trim();
+        const translated = t(trimmedKey);
+        return translated !== trimmedKey ? translated : trimmedKey;
+    }, [departements, t]);
+
+    const fetchTickets = useCallback(async () => {
         try {
-            const response = await api.get('/tickets');
-            const ticketData = response.data.data || response.data || [];
-            setTickets(Array.isArray(ticketData) ? ticketData : []);
+            const [ticketRes, catRes, deptRes] = await Promise.all([
+                api.get('/tickets'),
+                api.get('/categories').catch(() => ({ data: [] })),
+                api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
+            ]);
+
+            setTickets(ticketRes.data.data || ticketRes.data || []);
+            
+            const rawCats = catRes.data.data || catRes.data.categories || catRes.data;
+            setCategories(Array.isArray(rawCats) ? rawCats : []);
+
+            const rawDepts = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data;
+            setDepartements(Array.isArray(rawDepts) ? rawDepts : []);
         } catch {
             setErrorMsg(t('errorGeneric'));
         }
-    };
+    }, [t]);
 
     useEffect(() => {
         let isMounted = true;
         const loadData = async () => {
             try {
-                const response = await api.get('/tickets');
+                const [ticketRes, catRes, deptRes] = await Promise.all([
+                    api.get('/tickets'),
+                    api.get('/categories').catch(() => ({ data: [] })),
+                    api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
+                ]);
                 if (!isMounted) return;
-                const ticketData = response.data.data || response.data || [];
-                setTickets(Array.isArray(ticketData) ? ticketData : []);
+
+                setTickets(ticketRes.data.data || ticketRes.data || []);
+                
+                const catData = catRes.data.data || catRes.data.categories || catRes.data || [];
+                setCategories(Array.isArray(catData) ? catData : []);
+
+                const deptData = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data || [];
+                setDepartements(Array.isArray(deptData) ? deptData : []);
             } catch {
                 if (!isMounted) return;
                 setErrorMsg(t('errorGeneric'));
@@ -105,13 +309,51 @@ export default function TechnicianDashboard() {
         };
         loadData();
         return () => { isMounted = false; };
-    }, [t]);
+    }, [fetchTickets, t]);
 
-    const handleUpdateStatus = async (ticketId, newStatus) => {
+    // Fetch comments when a ticket is selected
+    useEffect(() => {
+        if (!selectedTicket?.id) {
+            setTicketComments([]);
+            setNewStatus('');
+            return;
+        }
+        setNewStatus(selectedTicket.statut || '');
+        api.get(`/tickets/${selectedTicket.id}/commentaires`)
+            .then(res => {
+                setTicketComments(res.data.data || res.data || []);
+            })
+            .catch(() => {
+                setTicketComments([]);
+            });
+    }, [selectedTicket]);
+
+    const handleUpdateStatus = async (ticketId, statutValue) => {
         try {
-            await api.patch(`/tickets/${ticketId}/statut`, { statut: newStatus });
+            await api.patch(`/tickets/${ticketId}/statut`, { statut: statutValue });
             fetchTickets();
+            if (selectedTicket?.id === ticketId) {
+                setSelectedTicket(prev => ({ ...prev, statut: statutValue }));
+            }
         } catch {
+            alert(t('errorGeneric'));
+        }
+    };
+
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim() || !selectedTicket?.id) return;
+        
+        try {
+            const res = await api.post(`/tickets/${selectedTicket.id}/commentaires`, { 
+                contenu: newComment,
+                texte: newComment 
+            });
+            const addedComment = res.data.data || res.data;
+            setTicketComments(prev => [...prev, addedComment]);
+            setNewComment('');
+        } catch (error) {
+            console.error('Comment error:', error.response?.data || error);
             alert(t('errorGeneric'));
         }
     };
@@ -127,11 +369,15 @@ export default function TechnicianDashboard() {
             ticket.id?.toString().includes(searchTerm);
         const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
 
-        const rawCat = typeof ticket.categorie === 'object' ? (ticket.categorie?.nom || ticket.categorie?.libelle || '') : (ticket.categorie || '');
-        const matchesCategory = categoryFilter === 'ALL' || rawCat.toUpperCase().includes(categoryFilter.toUpperCase());
+        const catKey = getCategoryKey(ticket.categorie || ticket.categorie_id || ticket.categoryId);
+        const matchesCategory = categoryFilter === 'ALL' || catKey === categoryFilter;
 
         return matchesSearch && matchesStatus && matchesCategory;
     });
+
+    const uniqueCategoryKeys = Array.from(
+        new Set(categories.map(cat => getCategoryKey(cat)))
+    ).filter(key => !['MAINTENANCE', 'RESEAU', 'SITE_WEB', 'TECH'].includes(key));
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -153,6 +399,7 @@ export default function TechnicianDashboard() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <NotificationBell />
                         <LanguageSwitcher />
                         <button
                             onClick={handleLogout}
@@ -221,8 +468,14 @@ export default function TechnicianDashboard() {
                         >
                             <option value="ALL">{t('allCategories')}</option>
                             <option value="MAINTENANCE">{t('MAINTENANCE')}</option>
-                            <option value="RESEAU">{t('NETWORK')}</option>
-                            <option value="SITE">{t('WEBSITE')}</option>
+                            <option value="RESEAU">{t('RESEAU')}</option>
+                            <option value="SITE_WEB">{t('SITE_WEB')}</option>
+                            <option value="TECH">{t('TECH')}</option>
+                            {uniqueCategoryKeys.map(catKey => (
+                                <option key={catKey} value={catKey}>
+                                    {t(catKey) !== catKey ? t(catKey) : catKey}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -239,15 +492,19 @@ export default function TechnicianDashboard() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredTickets.map(ticket => {
-                                    const categoryName = getCategoryName(ticket.categorie);
+                                    const categoryName = getCategoryName(ticket.categorie || ticket.categorie_id || ticket.categoryId);
                                     const departmentName = getDepartmentName(ticket);
                                     return (
-                                        <tr key={ticket.id} className="hover:bg-blue-50/30 transition-colors">
-                                            <td className="p-4 font-mono text-xs text-gray-400 font-semibold">#{ticket.id}</td>
+                                        <tr 
+                                            key={ticket.id || ticket._id} 
+                                            onClick={() => setSelectedTicket(ticket)}
+                                            className="hover:bg-blue-50/30 transition-colors cursor-pointer"
+                                        >
+                                            <td className="p-4 font-mono text-xs text-gray-400 font-semibold">#{formatId(ticket.id)}</td>
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-900">{ticket.titre}</div>
                                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${getCategoryBadge(ticket.categorie)}`}>
+                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${getCategoryBadge(ticket.categorie || ticket.categorie_id || ticket.categoryId)}`}>
                                                         {categoryName}
                                                     </span>
                                                     {departmentName && (
@@ -267,7 +524,7 @@ export default function TechnicianDashboard() {
                                                     {t(ticket.statut)}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-right">
+                                            <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <select
                                                     value={ticket.statut}
                                                     onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
@@ -296,6 +553,137 @@ export default function TechnicianDashboard() {
                 </div>
 
             </div>
+
+            {/* Ticket Details & Comments Modal */}
+            {selectedTicket && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <span className="text-xs font-mono font-bold text-gray-400">#{formatId(selectedTicket.id)}</span>
+                            <button 
+                                onClick={() => setSelectedTicket(null)}
+                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                            <h2 className="text-xl font-bold text-gray-900">{selectedTicket.titre}</h2>
+
+                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 text-sm">
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('category')}</span>
+                                    <span className="font-medium text-gray-800">{getCategoryName(selectedTicket.categorie || selectedTicket.categorie_id || selectedTicket.categoryId)}</span>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('department')}</span>
+                                    <span className="font-medium text-gray-800">{getDepartmentName(selectedTicket) || '—'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('priority')}</span>
+                                    <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${getPriorityBadge(selectedTicket.priorite)}`}>
+                                        {t(selectedTicket.priorite)}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('status')}</span>
+                                    <select
+                                        value={newStatus}
+                                        onChange={(e) => {
+                                            setNewStatus(e.target.value);
+                                            handleUpdateStatus(selectedTicket.id, e.target.value);
+                                        }}
+                                        className="bg-white border border-gray-200 rounded-xl px-3 py-1 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                                    >
+                                        <option value="NOUVEAU_NON_VU">{t('NOUVEAU_NON_VU')}</option>
+                                        <option value="NOUVEAU_VU">{t('NOUVEAU_VU')}</option>
+                                        <option value="EN_COURS">{t('EN_COURS')}</option>
+                                        <option value="RESOLU">{t('RESOLU')}</option>
+                                        <option value="FERME">{t('FERME')}</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('description')}</span>
+                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                    {selectedTicket.description}
+                                </div>
+                            </div>
+
+                            {selectedTicket.fichier_joint && (
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('fichierJoint')}</span>
+                                    <a 
+                                        href={selectedTicket.fichier_joint} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50/50 hover:bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-2xl transition-all"
+                                    >
+                                        <span>📎</span> {selectedTicket.fichier_joint.split('/').pop()}
+                                    </a>
+                                </div>
+                            )}
+
+                            {/* Comments Section */}
+                            <div className="space-y-4 pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('comments') || 'Commentaires'}</h3>
+                                
+                                <div className="space-y-3">
+                                    {ticketComments.map((comment, index) => (
+                                        <div key={comment.id || index} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-1">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-semibold text-gray-700">
+                                                    {comment.auteur?.prenom && comment.auteur?.nom 
+                                                        ? `${comment.auteur.prenom} ${comment.auteur.nom}` 
+                                                        : (comment.auteur?.email || comment.user?.prenom || t('unknownUser') || 'Utilisateur')}
+                                                </span>
+                                                <span className="text-gray-400 font-mono">
+                                                    {(comment.dateCreation || comment.createdAt) ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() : ''}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-800">{comment.contenu || comment.texte || comment.content}</p>
+                                        </div>
+                                    ))}
+                                    {ticketComments.length === 0 && (
+                                        <p className="text-xs text-gray-400 italic">{t('noComments') || 'Aucun commentaire pour le moment.'}</p>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleAddComment} className="flex gap-2 pt-2">
+                                    <input
+                                        type="text"
+                                        placeholder={t('writeCommentPlaceholder') || 'Écrire un commentaire...'}
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-all shadow-md cursor-pointer shrink-0"
+                                    >
+                                        {t('send') || 'Envoyer'}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+                            <button
+                                onClick={() => setSelectedTicket(null)}
+                                className="bg-gray-900 hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl text-xs transition-all cursor-pointer"
+                            >
+                                {t('close') || 'Fermer'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
