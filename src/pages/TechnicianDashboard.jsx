@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import logoUfc from '../assets/logo-ufc.png';
@@ -6,7 +7,24 @@ import { useLanguage } from '../hooks/useLanguage';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
 // ==========================================
-// EMBEDDED NOTIFICATION BELL & HOOK
+// REGIONAL CENTERS DISTRIBUTION MAP
+// ==========================================
+const technicianCentersMap = {
+  "صفية": ["وهران", "معسكر", "سعيدة", "البليدة", "ميلة", "سكيكدة"],
+  "عبد الرؤوف": ["الجلفة", "غرداية", "تيسمسيلت"],
+  "كريمة": ["بشار", "برج بوعريريج", "جيجل", "سيدي بلعباس", "الأغواط", "تبسة"],
+  "سميرة": ["المدية", "تيبياززة", "النعامة", "البويرة"],
+  "لمياء": ["الباب الزوار", "عين الدفلى", "بجاية"],
+  "منير": ["الجزائر شرق", "أم البواقي", "بن عكنون", "بومرداس"],
+  "عبد الرحمن": ["بسكرة"],
+  "جميلة": ["قسنطينة", "عنابة", "تلمسان", "سوق أهراس", "اليزي"],
+  "سهيلة": ["قالمة", "تڤرت", "الطارف", "بوزريعة"],
+  "سامية": ["خنشلة", "ورقلة", "الوادي", "تيارت", "مستغانم", "البيض"],
+  "مصطفى": ["تمنراست", "تيزي وزو", "المسيلة", "الشلف", "خميس مليانة", "غليزان", "أدرار", "باتنة"]
+};
+
+// ==========================================
+// EMBEDDED NOTIFICATION BELL & PORTAL DROPDOWN
 // ==========================================
 function NotificationBell() {
   const { t } = useLanguage();
@@ -51,16 +69,33 @@ function NotificationBell() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
-  const handleToggle = () => {
-    if (!isOpen && buttonRef.current) {
+  const updateCoords = useCallback(() => {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setCoords({
-        top: rect.top - 6, // Positioned much closer right above the button
+        top: rect.bottom + 8,
         right: window.innerWidth - rect.right,
       });
     }
+  }, []);
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      updateCoords();
+    }
     setIsOpen(!isOpen);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScrollOrResize = () => updateCoords();
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updateCoords]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -78,7 +113,7 @@ function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.estLue).length;
 
   return (
-    <div className="relative">
+    <div className="relative inline-block">
       <button
         ref={buttonRef}
         onClick={handleToggle}
@@ -107,32 +142,31 @@ function NotificationBell() {
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div 
           ref={dropdownRef}
           style={{
             top: `${coords.top}px`,
             right: `${coords.right}px`,
-            transform: 'translateY(-100%)'
           }}
-          className="fixed w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[9999] overflow-hidden"
+          className="fixed w-80 bg-white rounded-2xl shadow-[0_20px_50px_rgba(8,_112,_184,_0.25)] border border-gray-100 z-[999999] overflow-hidden"
         >
-          <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+          <div className="p-3 bg-gray-50/90 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-800 text-sm">{t('notifications')}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
               >
-                Tout marquer comme lu
+                {t('markAllAsRead') || 'Tout marquer comme lu'}
               </button>
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 bg-white">
             {notifications.length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-sm">
-                Aucune notification
+                {t('noNotifications') || 'Aucune notification'}
               </div>
             ) : (
               notifications.map((n) => (
@@ -154,7 +188,8 @@ function NotificationBell() {
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -204,24 +239,23 @@ const getCategoryKey = (categorie) => {
     return name;
 };
 
-const getCategoryBadge = (categorie) => {
-    const key = getCategoryKey(categorie);
-    if (key === 'MAINTENANCE') return 'bg-amber-50 text-amber-800 border border-amber-200/50';
-    if (key === 'RESEAU') return 'bg-blue-50 text-blue-800 border border-blue-200/50';
-    if (key === 'SITE_WEB') return 'bg-emerald-50 text-emerald-800 border border-emerald-200/50';
-    if (key === 'TECH') return 'bg-purple-50 text-purple-800 border border-purple-200/50';
-    return 'bg-slate-50 text-slate-700 border border-slate-200/50';
-};
-
 export default function TechnicianDashboard() {
     const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [departements, setDepartements] = useState([]);
     const [errorMsg, setErrorMsg] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
+
+    // Load logged in user state
+    const [user] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('user')) || {};
+        } catch {
+            return {};
+        }
+    });
 
     // State for modal & comments
     const [selectedTicket, setSelectedTicket] = useState(null);
@@ -248,37 +282,36 @@ export default function TechnicianDashboard() {
         const deptInput = ticket.departement || ticket.department || ticket.departement_id || ticket.departmentId || ticket.employe?.departement;
         if (!deptInput) return '';
 
-        let deptObj = deptInput;
-        
-        if (deptInput && typeof deptInput !== 'object') {
-            const found = departements.find(d => String(d.id || d._id) === String(deptInput));
-            if (found) deptObj = found;
-        }
-
-        const rawName = typeof deptObj === 'object' 
-            ? (deptObj.nom || deptObj.libelle || deptObj.name || deptObj.title || '') 
-            : String(deptObj);
+        const rawName = typeof deptInput === 'object' 
+            ? (deptInput.nom || deptInput.libelle || deptInput.name || deptInput.title || '') 
+            : String(deptInput);
 
         const trimmedKey = rawName.trim();
         const translated = t(trimmedKey);
         return translated !== trimmedKey ? translated : trimmedKey;
-    }, [departements, t]);
+    }, [t]);
+
+    const getCenterName = useCallback((ticket) => {
+        const centerInput = ticket.center || ticket.centre || ticket.centerId || ticket.centreId || ticket.employe?.center || ticket.employe?.centre;
+        if (!centerInput) return '';
+
+        if (typeof centerInput === 'object') {
+            return centerInput.nom || centerInput.libelle || centerInput.name || '';
+        }
+        return String(centerInput);
+    }, []);
 
     const fetchTickets = useCallback(async () => {
         try {
-            const [ticketRes, catRes, deptRes] = await Promise.all([
+            const [ticketRes, catRes] = await Promise.all([
                 api.get('/tickets'),
-                api.get('/categories').catch(() => ({ data: [] })),
-                api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
+                api.get('/categories').catch(() => ({ data: [] }))
             ]);
 
             setTickets(ticketRes.data.data || ticketRes.data || []);
             
             const rawCats = catRes.data.data || catRes.data.categories || catRes.data;
             setCategories(Array.isArray(rawCats) ? rawCats : []);
-
-            const rawDepts = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data;
-            setDepartements(Array.isArray(rawDepts) ? rawDepts : []);
         } catch {
             setErrorMsg(t('errorGeneric'));
         }
@@ -288,10 +321,9 @@ export default function TechnicianDashboard() {
         let isMounted = true;
         const loadData = async () => {
             try {
-                const [ticketRes, catRes, deptRes] = await Promise.all([
+                const [ticketRes, catRes] = await Promise.all([
                     api.get('/tickets'),
-                    api.get('/categories').catch(() => ({ data: [] })),
-                    api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
+                    api.get('/categories').catch(() => ({ data: [] }))
                 ]);
                 if (!isMounted) return;
 
@@ -299,9 +331,6 @@ export default function TechnicianDashboard() {
                 
                 const catData = catRes.data.data || catRes.data.categories || catRes.data || [];
                 setCategories(Array.isArray(catData) ? catData : []);
-
-                const deptData = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data || [];
-                setDepartements(Array.isArray(deptData) ? deptData : []);
             } catch {
                 if (!isMounted) return;
                 setErrorMsg(t('errorGeneric'));
@@ -379,14 +408,16 @@ export default function TechnicianDashboard() {
         new Set(categories.map(cat => getCategoryKey(cat)))
     ).filter(key => !['MAINTENANCE', 'RESEAU', 'SITE_WEB', 'TECH'].includes(key));
 
+    const assignedCenters = technicianCentersMap[user?.prenom || user?.nom || user?.name] || [];
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
             <div className="max-w-6xl mx-auto space-y-8">
 
                 {/* Header */}
                 <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-t-4 border-t-blue-600 border-x border-b border-blue-100 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-md p-1 overflow-hidden">
+                    <div className="flex items-start space-x-4">
+                        <div className="w-12 h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-md p-1 overflow-hidden shrink-0 mt-1">
                             <img src={logoUfc} alt="Logo UFC" className="w-full h-full object-contain" />
                         </div>
                         <div>
@@ -396,9 +427,20 @@ export default function TechnicianDashboard() {
                             </div>
                             <h1 className="text-2xl font-extrabold text-gray-900 mt-1">{t('technicianTitle')}</h1>
                             <p className="text-sm text-gray-500">{t('technicianSubtitle')}</p>
+                            
+                            {/* Assigned Centers Tags */}
+                            {assignedCenters.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                    {assignedCenters.map((centerName, idx) => (
+                                        <span key={idx} className="bg-blue-50/80 text-blue-700 border border-blue-200/60 text-[11px] font-semibold px-2 py-0.5 rounded-md shadow-2xs">
+                                            📍 {centerName}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 self-end sm:self-center">
                         <NotificationBell />
                         <LanguageSwitcher />
                         <button
@@ -484,7 +526,8 @@ export default function TechnicianDashboard() {
                             <thead>
                                 <tr className="bg-gray-50/75 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                                     <th className="p-4">{t('id')}</th>
-                                    <th className="p-4">{t('ticketTitle')} & {t('category')}</th>
+                                    <th className="p-4">{t('ticketTitle')} & {t('department')}</th>
+                                    <th className="p-4">{t('center')}</th>
                                     <th className="p-4">{t('priority')}</th>
                                     <th className="p-4">{t('status')}</th>
                                     <th className="p-4 text-right">{t('actions')}</th>
@@ -492,8 +535,8 @@ export default function TechnicianDashboard() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredTickets.map(ticket => {
-                                    const categoryName = getCategoryName(ticket.categorie || ticket.categorie_id || ticket.categoryId);
                                     const departmentName = getDepartmentName(ticket);
+                                    const centerName = getCenterName(ticket);
                                     return (
                                         <tr 
                                             key={ticket.id || ticket._id} 
@@ -504,15 +547,21 @@ export default function TechnicianDashboard() {
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-900">{ticket.titre}</div>
                                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${getCategoryBadge(ticket.categorie || ticket.categorie_id || ticket.categoryId)}`}>
-                                                        {categoryName}
-                                                    </span>
                                                     {departmentName && (
                                                         <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-800 border border-purple-200/50">
                                                             {departmentName}
                                                         </span>
                                                     )}
                                                 </div>
+                                            </td>
+                                            <td className="p-4">
+                                                {centerName ? (
+                                                    <span className="px-2 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-800 border border-blue-200/50 inline-block">
+                                                        📍 {centerName}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">—</span>
+                                                )}
                                             </td>
                                             <td className="p-4">
                                                 <span className={`px-2.5 py-1 text-xs rounded-lg font-medium inline-block ${getPriorityBadge(ticket.priorite)}`}>
@@ -542,7 +591,7 @@ export default function TechnicianDashboard() {
                                 })}
                                 {filteredTickets.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="p-8 text-center text-gray-400 text-sm">
+                                        <td colSpan="6" className="p-8 text-center text-gray-400 text-sm">
                                             {t('errorGeneric')}
                                         </td>
                                     </tr>
@@ -584,12 +633,16 @@ export default function TechnicianDashboard() {
                                     <span className="font-medium text-gray-800">{getDepartmentName(selectedTicket) || '—'}</span>
                                 </div>
                                 <div>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('center')}</span>
+                                    <span className="font-medium text-blue-700">{getCenterName(selectedTicket) || '—'}</span>
+                                </div>
+                                <div>
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('priority')}</span>
                                     <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${getPriorityBadge(selectedTicket.priorite)}`}>
                                         {t(selectedTicket.priorite)}
                                     </span>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('status')}</span>
                                     <select
                                         value={newStatus}
@@ -597,7 +650,7 @@ export default function TechnicianDashboard() {
                                             setNewStatus(e.target.value);
                                             handleUpdateStatus(selectedTicket.id, e.target.value);
                                         }}
-                                        className="bg-white border border-gray-200 rounded-xl px-3 py-1 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                                        className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer w-full sm:w-auto"
                                     >
                                         <option value="NOUVEAU_NON_VU">{t('NOUVEAU_NON_VU')}</option>
                                         <option value="NOUVEAU_VU">{t('NOUVEAU_VU')}</option>

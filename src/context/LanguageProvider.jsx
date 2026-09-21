@@ -3,7 +3,7 @@ import { LanguageContext } from './LanguageContext';
 
 const translations = {
     en: {
-        loginTitle: 'Welcome Back',
+        loginTitle: 'Hello',
         loginSubtitle: 'Sign in to access your dashboard',
         emailAddress: 'Email Address',
         email: 'Email',
@@ -77,6 +77,17 @@ const translations = {
         titlePlaceholder: 'Enter ticket title...',
         descriptionPlaceholder: 'Describe your issue in detail...',
         createdBy: 'Created by',
+        displayedCount: 'Displayed items',
+
+        // System Tickets & Centers
+        systemTickets: 'System Tickets',
+        systemTicketsSubtitle: 'Overview and management of system tickets across centers',
+        center: 'Center',
+        selectCenter: 'Select Center',
+        allCenters: 'All Centers',
+        CENTRE: 'Center',
+        Centre: 'Center',
+        centre: 'Center',
 
         // Notifications & Lists
         notifications: 'Notifications',
@@ -166,7 +177,7 @@ const translations = {
         URGENT: 'Urgent'
     },
     fr: {
-        loginTitle: 'Bon Retour',
+        loginTitle: 'Bonjour',
         loginSubtitle: 'Connectez-vous pour accéder à votre tableau de bord',
         emailAddress: 'Adresse e-mail',
         email: 'E-mail',
@@ -240,6 +251,17 @@ const translations = {
         titlePlaceholder: 'Entrez le titre du ticket...',
         descriptionPlaceholder: 'Décrivez votre problème en détail...',
         createdBy: 'Créé par',
+        displayedCount: 'Éléments affichés',
+
+        // System Tickets & Centers
+        systemTickets: 'Tickets Système',
+        systemTicketsSubtitle: 'Aperçu et gestion des tickets système dans tous les centres',
+        center: 'Centre',
+        selectCenter: 'Sélectionner un centre',
+        allCenters: 'Tous les centres',
+        CENTRE: 'Centre',
+        Centre: 'Centre',
+        centre: 'Centre',
 
         // Notifications & Lists
         notifications: 'Notifications',
@@ -329,7 +351,7 @@ const translations = {
         URGENT: 'Urgente'
     },
     ar: {
-        loginTitle: 'مرحباً بك مجدداً',
+        loginTitle: 'مرحباً',
         loginSubtitle: 'تسجيل الدخول للوصول إلى لوحة التحكم الخاصة بك',
         emailAddress: 'البريد الإلكتروني',
         email: 'البريد الإلكتروني',
@@ -403,6 +425,17 @@ const translations = {
         titlePlaceholder: 'أدخل عنوان التذكرة...',
         descriptionPlaceholder: 'صف مشكلتك بالتفصيل...',
         createdBy: 'أنشئت بواسطة',
+        displayedCount: 'العناصر المعروضة',
+
+        // System Tickets & Centers
+        systemTickets: 'تذاكر النظام',
+        systemTicketsSubtitle: 'نظرة عامة وإدارة تذاكر النظام عبر المراكز',
+        center: 'المركز',
+        selectCenter: 'اختر المركز',
+        allCenters: 'جميع المراكز',
+        CENTRE: 'المركز',
+        Centre: 'المركز',
+        centre: 'المركز',
 
         // Notifications & Lists
         notifications: 'الإشعارات',

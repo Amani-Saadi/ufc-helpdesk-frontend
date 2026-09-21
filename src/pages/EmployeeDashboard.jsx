@@ -55,10 +55,9 @@ function NotificationBell() {
   const handleToggle = () => {
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const dropdownWidth = 320; // w-80 = 320px
+      const dropdownWidth = 320;
       let leftPos = rect.left;
       
-      // Prevent dropdown from overflowing past the right edge of the window
       if (leftPos + dropdownWidth > window.innerWidth - 20) {
         leftPos = window.innerWidth - dropdownWidth - 20;
       }
@@ -198,35 +197,21 @@ const getPriorityBadge = (priorite) => {
     }
 };
 
-const getCategoryKey = (categorie) => {
-    if (!categorie) return 'UNCATEGORIZED';
-    const raw = typeof categorie === 'object' ? (categorie.nom || categorie.libelle || categorie.titre || categorie.name || '') : categorie;
-    const name = String(raw).trim().toUpperCase();
-    
-    if (name.includes('MAINTENANCE')) return 'MAINTENANCE';
-    if (name.includes('RESEAU') || name.includes('RÉSEAU') || name.includes('NETWORK')) return 'RESEAU';
-    if (name.includes('SITE') || name.includes('WEB') || name.includes('SITE_WEB')) return 'SITE_WEB';
-    return name;
-};
-
 export default function EmployeeDashboard() {
     const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [departements, setDepartements] = useState([]);
+    const [centers, setCenters] = useState([]);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
     const [titre, setTitre] = useState('');
     const [description, setDescription] = useState('');
     const [priorite, setPriorite] = useState('MOYENNE');
-    const [categorieId, setCategorieId] = useState('');
-    const [departementId, setDepartementId] = useState('');
+    const [centerId, setCenterId] = useState('');
     const [fichierJoint, setFichierJoint] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
-    const [categoryFilter, setCategoryFilter] = useState('ALL');
 
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [ticketComments, setTicketComments] = useState([]);
@@ -246,56 +231,69 @@ export default function EmployeeDashboard() {
         return item.id || item._id || item.code || item.nom || '';
     };
 
-    const getCategoryName = useCallback((categorieInput) => {
-        let catObj = categorieInput;
+    const getCenterName = useCallback((ticketOrCenterInput) => {
+        let centerInput = ticketOrCenterInput;
+        if (ticketOrCenterInput && typeof ticketOrCenterInput === 'object') {
+            centerInput = 
+                ticketOrCenterInput.centre || 
+                ticketOrCenterInput.center || 
+                ticketOrCenterInput.employe?.centre || 
+                ticketOrCenterInput.employe?.center || 
+                ticketOrCenterInput.centreId || 
+                ticketOrCenterInput.centerId || 
+                ticketOrCenterInput.centre_id || 
+                ticketOrCenterInput.center_id;
+        }
+        if (!centerInput) return '';
+
+        let centerObj = centerInput;
         
-        if (categorieInput && typeof categorieInput !== 'object') {
-            const found = categories.find(c => String(c.id || c._id) === String(categorieInput));
-            if (found) catObj = found;
+        if (centerInput && typeof centerInput !== 'object') {
+            const found = centers.find(c => String(c.id || c._id) === String(centerInput));
+            if (found) centerObj = found;
         }
 
-        const key = getCategoryKey(catObj);
-        const translated = t(key);
-        return translated !== key ? translated : (typeof catObj === 'object' ? (catObj.nom || catObj.libelle || catObj.name) : catObj);
-    }, [categories, t]);
+        const rawName = typeof centerObj === 'object' 
+            ? (centerObj.nom || centerObj.libelle || centerObj.name || centerObj.title || '') 
+            : String(centerObj);
 
-    const getDepartmentName = useCallback((ticket) => {
-        const deptInput = ticket.departement || ticket.department || ticket.departement_id || ticket.departmentId;
-        if (!deptInput) return '';
-
-        let deptObj = deptInput;
-        
-        if (deptInput && typeof deptInput !== 'object') {
-            const found = departements.find(d => String(d.id || d._id) === String(deptInput));
-            if (found) deptObj = found;
+        if (!rawName || (rawName === String(centerInput) && rawName.length > 20)) {
+            return '';
         }
-
-        const rawName = typeof deptObj === 'object' 
-            ? (deptObj.nom || deptObj.libelle || deptObj.name || deptObj.title || '') 
-            : String(deptObj);
 
         const trimmedKey = rawName.trim();
         const translated = t(trimmedKey);
         return translated !== trimmedKey ? translated : trimmedKey;
-    }, [departements, t]);
+    }, [centers, t]);
 
     const fetchData = useCallback(async () => {
         try {
-            const [ticketRes, catRes, deptRes] = await Promise.all([
-                api.get('/tickets'),
-                api.get('/categories').catch(() => ({ data: [] })),
-                api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
-            ]);
-
+            const ticketRes = await api.get('/tickets');
             setTickets(ticketRes.data.data || ticketRes.data || []);
-            
-            const rawCats = catRes.data.data || catRes.data.categories || catRes.data;
-            setCategories(Array.isArray(rawCats) ? rawCats : []);
-
-            const rawDepts = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data;
-            setDepartements(Array.isArray(rawDepts) ? rawDepts : []);
         } catch (err) {
-            console.error("Error fetching data:", err);
+            console.error("Error fetching tickets:", err);
+        }
+
+        try {
+            let centerRes;
+            try {
+                centerRes = await api.get('/centers');
+            } catch {
+                try {
+                    centerRes = await api.get('/centres');
+                } catch {
+                    centerRes = await api.get('/api/centers');
+                }
+            }
+
+            const rawData = centerRes?.data;
+            const centerList = Array.isArray(rawData) 
+                ? rawData 
+                : (rawData?.data || rawData?.centers || rawData?.centres || rawData?.list || []);
+            
+            setCenters(Array.isArray(centerList) ? centerList : []);
+        } catch (err) {
+            console.error("Error fetching centers:", err);
             setErrorMsg(t('errorGeneric'));
         }
     }, [t]);
@@ -303,29 +301,12 @@ export default function EmployeeDashboard() {
     useEffect(() => {
         let isMounted = true;
         const load = async () => {
-            try {
-                const [ticketRes, catRes, deptRes] = await Promise.all([
-                    api.get('/tickets'),
-                    api.get('/categories').catch(() => ({ data: [] })),
-                    api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
-                ]);
-                if (!isMounted) return;
-
-                setTickets(ticketRes.data.data || ticketRes.data || []);
-                
-                const catData = catRes.data.data || catRes.data.categories || catRes.data || [];
-                setCategories(Array.isArray(catData) ? catData : []);
-
-                const deptData = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data || [];
-                setDepartements(Array.isArray(deptData) ? deptData : []);
-            } catch {
-                if (!isMounted) return;
-                setErrorMsg(t('errorGeneric'));
-            }
+            await fetchData();
+            if (!isMounted) return;
         };
         load();
         return () => { isMounted = false; };
-    }, [fetchData, t]);
+    }, [fetchData]);
 
     useEffect(() => {
         if (!selectedTicket?.id) {
@@ -351,8 +332,7 @@ export default function EmployeeDashboard() {
             formData.append('titre', titre);
             formData.append('description', description);
             formData.append('priorite', priorite);
-            formData.append('categorieId', categorieId || '');
-            formData.append('departementId', departementId || '');
+            formData.append('centerId', centerId || '');
 
             if (fichierJoint) {
                 formData.append('fichier', fichierJoint);
@@ -368,8 +348,7 @@ export default function EmployeeDashboard() {
             setTitre('');
             setDescription('');
             setPriorite('MOYENNE');
-            setCategorieId('');
-            setDepartementId('');
+            setCenterId('');
             setFichierJoint(null);
             fetchData();
         } catch (err) {
@@ -420,15 +399,8 @@ export default function EmployeeDashboard() {
             ticket.id?.toString().includes(searchTerm);
         const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
 
-        const catKey = getCategoryKey(ticket.categorie || ticket.categorie_id || ticket.categoryId);
-        const matchesCategory = categoryFilter === 'ALL' || catKey === categoryFilter;
-
-        return matchesSearch && matchesStatus && matchesCategory;
+        return matchesSearch && matchesStatus;
     });
-
-    const uniqueCategoryKeys = Array.from(
-        new Set(categories.map(cat => getCategoryKey(cat)))
-    ).filter(key => !['MAINTENANCE', 'RESEAU', 'SITE_WEB'].includes(key));
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -480,46 +452,26 @@ export default function EmployeeDashboard() {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('category')}</label>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('center') || 'Center'}</label>
                             <select
                                 required
-                                value={categorieId}
-                                onChange={(e) => setCategorieId(e.target.value)}
+                                value={centerId}
+                                onChange={(e) => setCenterId(e.target.value)}
                                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
                             >
-                                <option value="">{t('selectCategory')}</option>
-                                {categories.map((cat, index) => {
-                                    const catVal = extractId(cat);
-                                    const catLabel = getCategoryName(cat);
+                                <option value="">{t('selectCenter') || 'Select Center'}</option>
+                                {centers.map((center, index) => {
+                                    const centerVal = extractId(center);
+                                    const centerLabel = extractLabel(center);
                                     return (
-                                        <option key={catVal || index} value={catVal}>
-                                            {catLabel}
+                                        <option key={centerVal || index} value={centerVal}>
+                                            {t(centerLabel) !== centerLabel ? t(centerLabel) : centerLabel}
                                         </option>
                                     );
                                 })}
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('department')}</label>
-                            <select
-                                required
-                                value={departementId}
-                                onChange={(e) => setDepartementId(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
-                            >
-                                <option value="">{t('selectDepartment')}</option>
-                                {departements.map((dept, index) => {
-                                    const deptVal = extractId(dept);
-                                    const deptLabel = extractLabel(dept);
-                                    return (
-                                        <option key={deptVal || index} value={deptVal}>
-                                            {t(deptLabel) !== deptLabel ? t(deptLabel) : deptLabel}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                        </div>
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('priority')}</label>
                             <select
                                 value={priorite}
@@ -584,7 +536,7 @@ export default function EmployeeDashboard() {
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                             type="text"
                             placeholder={t('searchPlaceholder')}
@@ -604,21 +556,6 @@ export default function EmployeeDashboard() {
                             <option value="RESOLU">{t('RESOLU')}</option>
                             <option value="FERME">{t('FERME')}</option>
                         </select>
-                        <select
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
-                        >
-                            <option value="ALL">{t('allCategories')}</option>
-                            <option value="MAINTENANCE">{t('MAINTENANCE')}</option>
-                            <option value="RESEAU">{t('RESEAU')}</option>
-                            <option value="SITE_WEB">{t('SITE_WEB')}</option>
-                            {uniqueCategoryKeys.map(catKey => (
-                                <option key={catKey} value={catKey}>
-                                    {t(catKey) !== catKey ? t(catKey) : catKey}
-                                </option>
-                            ))}
-                        </select>
                     </div>
 
                     <div className="overflow-x-auto rounded-2xl border border-gray-100">
@@ -626,7 +563,7 @@ export default function EmployeeDashboard() {
                             <thead>
                                 <tr className="bg-gray-50/75 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                                     <th className="p-4">{t('id')}</th>
-                                    <th className="p-4">{t('ticketTitle')} & {t('category')}</th>
+                                    <th className="p-4">{t('ticketTitle')} & {t('center') || 'Center'}</th>
                                     <th className="p-4">{t('priority')}</th>
                                     <th className="p-4">{t('status')}</th>
                                     <th className="p-4 text-right">{t('actions')}</th>
@@ -634,8 +571,7 @@ export default function EmployeeDashboard() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredTickets.map(ticket => {
-                                    const categoryName = getCategoryName(ticket.categorie || ticket.categorie_id || ticket.categoryId);
-                                    const departmentName = getDepartmentName(ticket);
+                                    const centerName = getCenterName(ticket);
                                     const displayStatus = ticket.statut === 'RESOLU' ? 'FERME' : ticket.statut;
                                     return (
                                         <tr 
@@ -647,12 +583,9 @@ export default function EmployeeDashboard() {
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-900">{ticket.titre}</div>
                                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-slate-100 text-slate-700 border border-slate-200/50">
-                                                        {categoryName}
-                                                    </span>
-                                                    {departmentName && (
+                                                    {centerName && (
                                                         <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-800 border border-purple-200/50">
-                                                            {departmentName}
+                                                            {centerName}
                                                         </span>
                                                     )}
                                                 </div>
@@ -716,12 +649,8 @@ export default function EmployeeDashboard() {
 
                             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 text-sm">
                                 <div>
-                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('category')}</span>
-                                    <span className="font-medium text-gray-800">{getCategoryName(selectedTicket.categorie || selectedTicket.categorie_id || selectedTicket.categoryId)}</span>
-                                </div>
-                                <div>
-                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('department')}</span>
-                                    <span className="font-medium text-gray-800">{getDepartmentName(selectedTicket) || '—'}</span>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('center') || 'Center'}</span>
+                                    <span className="font-medium text-gray-800">{getCenterName(selectedTicket) || '—'}</span>
                                 </div>
                                 <div>
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('priority')}</span>
@@ -729,7 +658,7 @@ export default function EmployeeDashboard() {
                                         {t(selectedTicket.priorite)}
                                     </span>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('status')}</span>
                                     <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${getStatusBadge(selectedTicket.statut)}`}>
                                         {t(selectedTicket.statut)}
@@ -791,7 +720,7 @@ export default function EmployeeDashboard() {
                                         type="submit"
                                         className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-all shadow-sm cursor-pointer shrink-0"
                                     >
-                                        {t('send') || 'Send'}
+                                        {t('send') || 'Resolution'}
                                     </button>
                                 </form>
                             </div>

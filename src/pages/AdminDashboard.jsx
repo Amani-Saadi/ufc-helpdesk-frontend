@@ -192,37 +192,14 @@ const getPriorityBadge = (priorite) => {
     }
 };
 
-const getCategoryKey = (categorie) => {
-    if (!categorie) return 'UNCATEGORIZED';
-    const raw = typeof categorie === 'object' ? (categorie.nom || categorie.libelle || categorie.titre || categorie.name || '') : categorie;
-    const name = String(raw).trim().toUpperCase();
-    
-    if (name.includes('MAINTENANCE')) return 'MAINTENANCE';
-    if (name.includes('RESEAU') || name.includes('RÉSEAU') || name.includes('NETWORK')) return 'RESEAU';
-    if (name.includes('SITE') || name.includes('WEB') || name.includes('SITE_WEB')) return 'SITE_WEB';
-    if (name.includes('TECH')) return 'TECH';
-    return name;
-};
-
-const getCategoryBadge = (categorie) => {
-    const key = getCategoryKey(categorie);
-    if (key === 'MAINTENANCE') return 'bg-amber-50 text-amber-800 border border-amber-200/50';
-    if (key === 'RESEAU') return 'bg-blue-50 text-blue-800 border border-amber-200/50';
-    if (key === 'SITE_WEB') return 'bg-emerald-50 text-emerald-800 border border-emerald-200/50';
-    if (key === 'TECH') return 'bg-purple-50 text-purple-800 border border-purple-200/50';
-    return 'bg-slate-50 text-slate-700 border border-slate-200/50';
-};
-
 export default function AdminDashboard() {
     const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
     const [users, setUsers] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [departements, setDepartements] = useState([]);
+    const [centers, setCenters] = useState([]);
     const [errorMsg, setErrorMsg] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
-    const [categoryFilter, setCategoryFilter] = useState('ALL');
 
     const [showUserManagement, setShowUserManagement] = useState(true);
 
@@ -233,27 +210,14 @@ export default function AdminDashboard() {
 
     const navigate = useNavigate();
 
-    const getCategoryName = useCallback((categorieInput) => {
-        let catObj = categorieInput;
-        
-        if (categorieInput && typeof categorieInput !== 'object') {
-            const found = categories.find(c => String(c.id || c._id) === String(categorieInput));
-            if (found) catObj = found;
-        }
-
-        const key = getCategoryKey(catObj);
-        const translated = t(key);
-        return translated !== key ? translated : (typeof catObj === 'object' ? (catObj.nom || catObj.libelle || catObj.name) : catObj);
-    }, [categories, t]);
-
     const getDepartmentName = useCallback((ticket) => {
-        const deptInput = ticket.departement || ticket.department || ticket.departement_id || ticket.departmentId || ticket.employe?.departement || ticket.employe?.service;
+        const deptInput = ticket.departement || ticket.department || ticket.departement_id || ticket.departmentId || ticket.user?.departement || ticket.user?.service;
         if (!deptInput) return '';
 
         let deptObj = deptInput;
         
         if (deptInput && typeof deptInput !== 'object') {
-            const found = departements.find(d => String(d.id || d._id) === String(deptInput));
+            const found = centers.find(c => String(c.id || c._id) === String(deptInput));
             if (found) deptObj = found;
         }
 
@@ -264,30 +228,48 @@ export default function AdminDashboard() {
         const trimmedKey = rawName.trim();
         const translated = t(trimmedKey);
         return translated !== trimmedKey ? translated : trimmedKey;
-    }, [departements, t]);
+    }, [centers, t]);
+
+    const getCenterName = useCallback((ticket) => {
+        const centerInput = ticket.centre || ticket.center || ticket.centre_id || ticket.centerId || ticket.user?.centre || ticket.user?.center;
+        if (!centerInput) return t('N/A') || 'N/A';
+
+        let rawName = '';
+        if (typeof centerInput === 'object') {
+            rawName = centerInput.nom || centerInput.libelle || centerInput.name || centerInput.code || '';
+        } else {
+            rawName = String(centerInput);
+        }
+
+        if (!rawName) return t('N/A') || 'N/A';
+
+        const trimmedKey = rawName.trim();
+        const translated = t(trimmedKey);
+        return translated !== trimmedKey ? translated : trimmedKey;
+    }, [t]);
 
     const fetchData = useCallback(async (isMounted = { current: true }) => {
         try {
-            const [ticketRes, userRes, catRes, deptRes] = await Promise.all([
+            const [ticketRes, userRes, centerRes] = await Promise.all([
                 api.get('/tickets'),
-                api.get('/admin/users').catch((err) => {
-                    console.error("Failed to load users:", err);
-                    return { data: [] };
+                api.get('/admin/users').catch(async () => {
+                    return api.get('/users').catch(() => ({ data: [] }));
                 }),
-                api.get('/categories').catch(() => ({ data: [] })),
-                api.get('/departments').catch(() => api.get('/departements').catch(() => ({ data: [] })))
+                api.get('/admin/centers').catch(async () => {
+                    return api.get('/centers').catch(() => ({ data: [] }));
+                })
             ]);
 
             if (!isMounted.current) return;
 
             setTickets(ticketRes.data.data || ticketRes.data || []);
-            setUsers(userRes.data.data || userRes.data || []);
             
-            const catData = catRes.data.data || catRes.data.categories || catRes.data || [];
-            setCategories(Array.isArray(catData) ? catData : []);
+            // Format user database objects
+            const rawUsers = userRes.data.data || userRes.data.users || userRes.data || [];
+            setUsers(Array.isArray(rawUsers) ? rawUsers : []);
 
-            const deptData = deptRes.data.data || deptRes.data.departements || deptRes.data.departments || deptRes.data || [];
-            setDepartements(Array.isArray(deptData) ? deptData : []);
+            const centerData = centerRes.data.data || centerRes.data.centers || centerRes.data.centres || centerRes.data || [];
+            setCenters(Array.isArray(centerData) ? centerData : []);
 
             setErrorMsg('');
         } catch {
@@ -352,7 +334,7 @@ export default function AdminDashboard() {
 
     const handleToggleDeactivateUser = async (userId) => {
         try {
-            await api.patch(`/admin/users/${userId}/deactivate`);
+            await api.patch(`/admin/users/${userId}/deactivate`).catch(() => api.patch(`/users/${userId}/toggle-active`));
             fetchData();
         } catch (error) {
             alert(error.response?.data?.message || t('errorGeneric'));
@@ -367,18 +349,12 @@ export default function AdminDashboard() {
     const filteredTickets = tickets.filter(ticket => {
         const matchesSearch =
             ticket.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ticket.id?.toString().includes(searchTerm);
+            ticket.id?.toString().includes(searchTerm) ||
+            getCenterName(ticket).toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
 
-        const catKey = getCategoryKey(ticket.categorie || ticket.categorie_id || ticket.categoryId);
-        const matchesCategory = categoryFilter === 'ALL' || catKey === categoryFilter;
-
-        return matchesSearch && matchesStatus && matchesCategory;
+        return matchesSearch && matchesStatus;
     });
-
-    const uniqueCategoryKeys = Array.from(
-        new Set(categories.map(cat => getCategoryKey(cat)))
-    ).filter(key => !['MAINTENANCE', 'RESEAU', 'SITE_WEB', 'TECH'].includes(key));
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -423,7 +399,7 @@ export default function AdminDashboard() {
                         <div className="text-3xl font-black text-gray-900 mt-2">{tickets.length}</div>
                     </div>
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-purple-600 border-r border-y border-blue-100 shadow-xl">
-                        <div className="text-purple-600 text-xs font-bold uppercase tracking-wider">{t('totalUsers')}</div>
+                        <div className="text-purple-600 text-xs font-bold uppercase tracking-wider">{t('totalUsers') || 'Comptes & Centres'}</div>
                         <div className="text-3xl font-black text-purple-600 mt-2">{users.length}</div>
                     </div>
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-emerald-500 border-r border-y border-blue-100 shadow-xl">
@@ -434,30 +410,30 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* SECTION TOGGLE BUTTON FOR USER MANAGEMENT */}
+                {/* SECTION TOGGLE BUTTON FOR USER & CENTER MANAGEMENT */}
                 <div className="bg-white/95 backdrop-blur-sm p-6 rounded-3xl border border-blue-100 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">{t('userManagementTitle') || 'Gestion des Comptes Utilisateurs'}</h2>
-                        <p className="text-xs text-gray-400">{t('userManagementSubtitle') || "Activer ou désactiver les employés et techniciens du système"}</p>
+                        <h2 className="text-lg font-bold text-gray-900">{t('userManagementTitle') || 'Gestion des Comptes & Centres'}</h2>
+                        <p className="text-xs text-gray-400">{t('userManagementSubtitle') || "Activer ou désactiver les comptes utilisateurs et centres"}</p>
                     </div>
                     <button
                         onClick={() => setShowUserManagement(!showUserManagement)}
                         className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2.5 rounded-2xl text-xs transition-all shadow-md cursor-pointer flex items-center gap-2"
                     >
-                        {showUserManagement ? (t('closeUserManagement') || 'Masquer la gestion des utilisateurs') : (t('openUserManagement') || 'Afficher la gestion des utilisateurs')}
+                        {showUserManagement ? (t('closeUserManagement') || 'Masquer la gestion des comptes') : (t('openUserManagement') || 'Afficher la gestion des comptes')}
                     </button>
                 </div>
 
-                {/* EXPANDABLE USER MANAGEMENT SECTION */}
+                {/* ACCOUNTS AND CENTRES TABLE */}
                 {showUserManagement && (
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl border border-purple-100 shadow-xl p-8 space-y-6 animate-fadeIn">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
-                                <h3 className="text-md font-bold text-gray-900">{t('usersListTitle') || 'Liste des Employés & Techniciens'}</h3>
-                                <p className="text-xs text-gray-400">{t('usersListSubtitle') || "Gérez l'accès des comptes utilisateurs"}</p>
+                                <h3 className="text-md font-bold text-gray-900">{t('usersListTitle') || 'Tous les Comptes (Utilisateurs & Centres)'}</h3>
+                                <p className="text-xs text-gray-400">{t('usersListSubtitle') || "Gérez l'accès de l'ensemble des comptes du système"}</p>
                             </div>
                             <span className="text-xs bg-purple-50 text-purple-800 font-semibold px-3 py-1.5 rounded-full border border-purple-200">
-                                {users.length} {t('registeredUsersCount') || 'utilisateurs enregistrés'}
+                                {users.length} {t('registeredUsersCount') || 'comptes enregistrés'}
                             </span>
                         </div>
 
@@ -465,7 +441,7 @@ export default function AdminDashboard() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-gray-50/75 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        <th className="p-4">{t('fullName') || 'Nom & Prénom'}</th>
+                                        <th className="p-4">{t('fullName') || 'Nom / Centre'}</th>
                                         <th className="p-4">{t('email') || 'Email'}</th>
                                         <th className="p-4">{t('role') || 'Rôle'}</th>
                                         <th className="p-4">{t('status') || 'Statut'}</th>
@@ -473,15 +449,31 @@ export default function AdminDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm">
-                                    {users.map(u => {
-                                        const isActive = u.statutActif !== false;
+                                    {users.map((u, idx) => {
+                                        // Detect if account is active from true / false database fields
+                                        const isActive = u.statutActif !== undefined ? u.statutActif : (u.estActif !== undefined ? u.estActif : u.active !== false);
+                                        
+                                        // Detect center vs normal employee account
+                                        const emailStr = (u.email || '').toLowerCase();
+                                        const rawRole = (u.role || u.type || 'EMPLOYE').toUpperCase();
+                                        const isCenter = emailStr.startsWith('centre') || u.nomCentre || (u.nom && u.nom.toLowerCase().includes('centre'));
+                                        
+                                        // Formatted Name Display
+                                        const displayName = [u.nom, u.prenom].filter(Boolean).join(' ') || u.nomCentre || u.name || u.email;
+
                                         return (
-                                            <tr key={u.id} className="hover:bg-purple-50/25 transition-colors">
-                                                <td className="p-4 font-semibold text-gray-900">{u.nom} {u.prenom}</td>
-                                                <td className="p-4 text-gray-600">{u.email}</td>
+                                            <tr key={u.id || u._id || idx} className="hover:bg-purple-50/25 transition-colors">
+                                                <td className="p-4 font-semibold text-gray-900">
+                                                    {displayName}
+                                                </td>
+                                                <td className="p-4 text-gray-600 font-mono text-xs">{u.email}</td>
                                                 <td className="p-4">
-                                                    <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 border border-blue-200/50">
-                                                        {t(u.role?.toUpperCase()) || u.role}
+                                                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg border ${
+                                                        isCenter 
+                                                            ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                                            : 'bg-blue-50 text-blue-700 border-blue-200/50'
+                                                    }`}>
+                                                        {isCenter ? t('CENTRE') : (t(rawRole) || rawRole)}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
@@ -490,12 +482,11 @@ export default function AdminDashboard() {
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-right">
-                                                    {/* CUSTOM TOGGLE SWITCH */}
                                                     <label className="relative inline-flex items-center cursor-pointer select-none justify-end">
                                                         <input 
                                                             type="checkbox" 
-                                                            checked={isActive}
-                                                            onChange={() => handleToggleDeactivateUser(u.id)}
+                                                            checked={Boolean(isActive)}
+                                                            onChange={() => handleToggleDeactivateUser(u.id || u._id)}
                                                             className="sr-only peer" 
                                                         />
                                                         <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
@@ -507,7 +498,7 @@ export default function AdminDashboard() {
                                     {users.length === 0 && (
                                         <tr>
                                             <td colSpan="5" className="p-8 text-center text-gray-400 text-sm">
-                                                {t('noUsersFound') || 'Aucun utilisateur trouvé'}
+                                                {t('noUsersFound') || 'Aucun compte trouvé'}
                                             </td>
                                         </tr>
                                     )}
@@ -530,10 +521,10 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Filters */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                             type="text"
-                            placeholder={t('searchPlaceholder')}
+                            placeholder={t('searchPlaceholder') || 'Rechercher par titre, ID ou centre...'}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
@@ -550,22 +541,6 @@ export default function AdminDashboard() {
                             <option value="RESOLU">{t('RESOLU')}</option>
                             <option value="FERME">{t('FERME')}</option>
                         </select>
-                        <select
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
-                        >
-                            <option value="ALL">{t('allCategories')}</option>
-                            <option value="MAINTENANCE">{t('MAINTENANCE')}</option>
-                            <option value="RESEAU">{t('RESEAU')}</option>
-                            <option value="SITE_WEB">{t('SITE_WEB')}</option>
-                            <option value="TECH">{t('TECH')}</option>
-                            {uniqueCategoryKeys.map(catKey => (
-                                <option key={catKey} value={catKey}>
-                                    {t(catKey) !== catKey ? t(catKey) : catKey}
-                                </option>
-                            ))}
-                        </select>
                     </div>
 
                     {/* Tickets Table */}
@@ -574,7 +549,8 @@ export default function AdminDashboard() {
                             <thead>
                                 <tr className="bg-gray-50/75 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                                     <th className="p-4">{t('id')}</th>
-                                    <th className="p-4">{t('ticketTitle')} & {t('category')}</th>
+                                    <th className="p-4">{t('ticketTitle')}</th>
+                                    <th className="p-4">{t('centre') || 'Centre'}</th>
                                     <th className="p-4">{t('priority')}</th>
                                     <th className="p-4">{t('status')}</th>
                                     <th className="p-4 text-right">{t('actions')}</th>
@@ -582,8 +558,9 @@ export default function AdminDashboard() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
                                 {filteredTickets.map(ticket => {
-                                    const categoryName = getCategoryName(ticket.categorie || ticket.categorie_id || ticket.categoryId);
                                     const departmentName = getDepartmentName(ticket);
+                                    const centerName = getCenterName(ticket);
+
                                     return (
                                         <tr 
                                             key={ticket.id || ticket._id} 
@@ -593,16 +570,18 @@ export default function AdminDashboard() {
                                             <td className="p-4 font-mono text-xs text-gray-400 font-semibold">#{formatId(ticket.id)}</td>
                                             <td className="p-4">
                                                 <div className="font-semibold text-gray-900">{ticket.titre}</div>
-                                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${getCategoryBadge(ticket.categorie || ticket.categorie_id || ticket.categoryId)}`}>
-                                                        {categoryName}
-                                                    </span>
-                                                    {departmentName && (
+                                                {departmentName && (
+                                                    <div className="mt-1">
                                                         <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-800 border border-purple-200/50">
                                                             {departmentName}
                                                         </span>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/60 inline-block">
+                                                    {centerName}
+                                                </span>
                                             </td>
                                             <td className="p-4">
                                                 <span className={`px-2.5 py-1 text-xs rounded-lg font-medium inline-block ${getPriorityBadge(ticket.priorite)}`}>
@@ -632,7 +611,7 @@ export default function AdminDashboard() {
                                 })}
                                 {filteredTickets.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="p-8 text-center text-gray-400 text-sm">
+                                        <td colSpan="6" className="p-8 text-center text-gray-400 text-sm">
                                             {t('noTicketsFound')}
                                         </td>
                                     </tr>
@@ -666,8 +645,8 @@ export default function AdminDashboard() {
 
                             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 text-sm">
                                 <div>
-                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('category')}</span>
-                                    <span className="font-medium text-gray-800">{getCategoryName(selectedTicket.categorie || selectedTicket.categorie_id || selectedTicket.categoryId)}</span>
+                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('centre') || 'Centre'}</span>
+                                    <span className="font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{getCenterName(selectedTicket)}</span>
                                 </div>
                                 <div>
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('department')}</span>
