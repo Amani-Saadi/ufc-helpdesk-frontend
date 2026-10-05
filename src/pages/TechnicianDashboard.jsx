@@ -5,22 +5,64 @@ import api from '../services/api';
 import logoUfc from '../assets/logo-ufc.png';
 import { useLanguage } from '../hooks/useLanguage';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ResponseTimeBadge from '../components/ResponseTimeBadge';
+import { RESPONSE_LIMIT_MS, formatDurationInMs, getTicketEndDate } from '../utils/responseTime';
 
 // ==========================================
-// REGIONAL CENTERS DISTRIBUTION MAP
+// REGIONAL CENTERS DISTRIBUTION MAP (Arabic & Latin)
 // ==========================================
 const technicianCentersMap = {
   "صفية": ["وهران", "معسكر", "سعيدة", "البليدة", "ميلة", "سكيكدة"],
+  "safia": ["وهران", "معسكر", "سعيدة", "البليدة", "ميلة", "سكيكدة"],
+
   "عبد الرؤوف": ["الجلفة", "غرداية", "تيسمسيلت"],
+  "abderraouf": ["الجلفة", "غرداية", "تيسمسيلت"],
+  "abderouf": ["الجلفة", "غرداية", "تيسمسيلت"],
+
   "كريمة": ["بشار", "برج بوعريريج", "جيجل", "سيدي بلعباس", "الأغواط", "تبسة"],
+  "karima": ["بشار", "برج بوعريريج", "جيجل", "سيدي بلعباس", "الأغواط", "تبسة"],
+
   "سميرة": ["المدية", "تيبياززة", "النعامة", "البويرة"],
+  "samira": ["المدية", "تيبياززة", "النعامة", "البويرة"],
+
   "لمياء": ["الباب الزوار", "عين الدفلى", "بجاية"],
+  "lamia": ["الباب الزوار", "عين الدفلى", "بجاية"],
+
   "منير": ["الجزائر شرق", "أم البواقي", "بن عكنون", "بومرداس"],
+  "mounir": ["الجزائر شرق", "أم البواقي", "بن عكنون", "بومرداس"],
+
   "عبد الرحمن": ["بسكرة"],
+  "abderrahmane": ["بسكرة"],
+  "abderrahman": ["بسكرة"],
+
   "جميلة": ["قسنطينة", "عنابة", "تلمسان", "سوق أهراس", "اليزي"],
+  "djamila": ["قسنطينة", "عنابة", "تلمسان", "سوق أهراس", "اليزي"],
+
   "سهيلة": ["قالمة", "تڤرت", "الطارف", "بوزريعة"],
+  "souhila": ["قالمة", "تڤرت", "الطارف", "بوزريعة"],
+
   "سامية": ["خنشلة", "ورقلة", "الوادي", "تيارت", "مستغانم", "البيض"],
-  "مصطفى": ["تمنراست", "تيزي وزو", "المسيلة", "الشلف", "خميس مليانة", "غليزان", "أدرار", "باتنة"]
+  "samia": ["خنشلة", "ورقلة", "الوادي", "تيارت", "مستغانم", "البيض"],
+
+  "مصطفى": ["تمنراست", "تيزي وزو", "المسيلة", "الشلف", "خميس مليانة", "غليزان", "أدرار", "باتنة"],
+  "mustapha": ["تمنراست", "تيزي وزو", "المسيلة", "الشلف", "خميس مليانة", "غليزان", "أدرار", "باتنة"]
+};
+
+// Helper to normalize strings for robust matching
+const normalizeStr = (str) => String(str || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+
+// Average response time for resolved/closed tickets.
+// This is a technician-level KPI, not a per-ticket value.
+const computeAverageResponse = (ticketList) => {
+  const durations = ticketList
+    .filter(tk => tk.statut === 'RESOLU' || tk.statut === 'FERME')
+    .map(tk => new Date(getTicketEndDate(tk)) - new Date(tk.dateCreation || tk.createdAt))
+    .filter(ms => !isNaN(ms));
+
+  if (!durations.length) return { avgMs: null, label: '--', count: 0 };
+
+  const avgMs = durations.reduce((sum, ms) => sum + Math.max(ms, 0), 0) / durations.length;
+  return { avgMs, label: formatDurationInMs(avgMs), count: durations.length };
 };
 
 // ==========================================
@@ -248,6 +290,16 @@ export default function TechnicianDashboard() {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
 
+    // Change Password Modal States
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({
+        ancienMotDePasse: '',
+        nouveauMotDePasse: '',
+        confirmerMotDePasse: ''
+    });
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+
     // Load logged in user state
     const [user] = useState(() => {
         try {
@@ -387,12 +439,101 @@ export default function TechnicianDashboard() {
         }
     };
 
+    const handleChangePasswordSubmit = async (e) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess('');
+
+        if (passwordForm.nouveauMotDePasse !== passwordForm.confirmerMotDePasse) {
+            setPasswordError(t('passwordsDontMatch') || 'Les mots de passe ne correspondent pas');
+            return;
+        }
+
+        try {
+            await api.patch('/auth/change-password', {
+              ancienMotDePasse: passwordForm?.ancienMotDePasse || passwordForm?.currentPassword || passwordForm?.oldPassword || '',
+              nouveauMotDePasse: passwordForm?.nouveauMotDePasse || passwordForm?.newPassword || '',
+              oldPassword: passwordForm?.ancienMotDePasse || passwordForm?.currentPassword || passwordForm?.oldPassword || '',
+              newPassword: passwordForm?.nouveauMotDePasse || passwordForm?.newPassword || '',
+              currentPassword: passwordForm?.ancienMotDePasse || passwordForm?.currentPassword || passwordForm?.oldPassword || ''
+            });
+            setPasswordSuccess(t('passwordChangedSuccess') || 'Mot de passe modifié avec succès');
+            setPasswordForm({ ancienMotDePasse: '', nouveauMotDePasse: '', confirmerMotDePasse: '' });
+            setTimeout(() => {
+                setIsPasswordModalOpen(false);
+                setPasswordSuccess('');
+            }, 2000);
+        } catch (err) {
+            setPasswordError(err.response?.data?.message || t('errorGeneric'));
+        }
+    };
+
     const handleLogout = () => {
         localStorage.clear();
         navigate('/login');
     };
 
+    // Check if user is an administrator based on their role or email
+    const isAdmin = useMemo(() => {
+        const email = String(user?.email || '').toLowerCase();
+        const role = String(user?.role || user?.type || '').toLowerCase();
+        
+        if (role.includes('employe') || role === 'employe') {
+            return false;
+        }
+
+        return email === 'centre.ufc@ufc.dz' || role.includes('admin') || role.includes('responsable');
+    }, [user]);
+
+    // Assigned centers (Database-first connection with robust map fallback)
+    const assignedCenters = useMemo(() => {
+        if (isAdmin) return [];
+
+        // 1. Check if the database user object already has centers assigned directly
+        const dbCenters = user?.centres || user?.centers || user?.centre || user?.assignedCenters;
+        if (dbCenters) {
+            if (Array.isArray(dbCenters)) {
+                return dbCenters.map(c => typeof c === 'object' ? (c.nom || c.libelle || c.name || '') : String(c)).filter(Boolean);
+            }
+            if (typeof dbCenters === 'string') {
+                return dbCenters.split(',').map(s => s.trim()).filter(Boolean);
+            }
+        }
+
+        // 2. Fallback lookup via technicianCentersMap using normalized keys
+        const possibleKeys = [
+            user?.prenom,
+            user?.nom,
+            user?.name,
+            user?.username,
+            user?.email?.split('@')[0]
+        ].filter(Boolean).map(n => normalizeStr(n));
+
+        for (const key of possibleKeys) {
+            for (const [mapKey, centers] of Object.entries(technicianCentersMap)) {
+                const normMapKey = normalizeStr(mapKey);
+                if (key.includes(normMapKey) || normMapKey.includes(key)) {
+                    return centers;
+                }
+            }
+        }
+        return [];
+    }, [user, isAdmin]);
+
+    // Filter tickets with robust normalized center matching
     const filteredTickets = tickets.filter(ticket => {
+        const centerName = getCenterName(ticket);
+        
+        if (!isAdmin && assignedCenters.length > 0) {
+            const normalizedAssigned = assignedCenters.map(c => normalizeStr(c));
+            const ticketCenterNormalized = normalizeStr(centerName);
+            
+            const matchesCenter = normalizedAssigned.some(
+                c => ticketCenterNormalized.includes(c) || c.includes(ticketCenterNormalized)
+            );
+            if (!matchesCenter) return false;
+        }
+
         const matchesSearch =
             ticket.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             ticket.id?.toString().includes(searchTerm);
@@ -408,7 +549,9 @@ export default function TechnicianDashboard() {
         new Set(categories.map(cat => getCategoryKey(cat)))
     ).filter(key => !['MAINTENANCE', 'RESEAU', 'SITE_WEB', 'TECH'].includes(key));
 
-    const assignedCenters = technicianCentersMap[user?.prenom || user?.nom || user?.name] || [];
+    // Technician-level response KPI: one average displayed in the dashboard,
+    // while individual tickets keep their own ResponseTimeBadge in the table.
+    const technicianResponse = computeAverageResponse(filteredTickets);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -422,26 +565,50 @@ export default function TechnicianDashboard() {
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold tracking-wider text-blue-700 uppercase bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">{t('techSpace')}</span>
+                                <span className="text-xs font-semibold tracking-wider text-blue-700 uppercase bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                                    {isAdmin ? 'Admin Space' : t('techSpace')}
+                                </span>
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                             </div>
-                            <h1 className="text-2xl font-extrabold text-gray-900 mt-1">{t('technicianTitle')}</h1>
-                            <p className="text-sm text-gray-500">{t('technicianSubtitle')}</p>
+                            <h1 className="text-2xl font-extrabold text-gray-900 mt-1">
+                                {isAdmin ? 'Administration Dashboard' : t('technicianTitle')}
+                            </h1>
+                            <p className="text-sm text-gray-500">
+                                {isAdmin ? 'Vue globale de tous les tickets' : t('technicianSubtitle')}
+                            </p>
                             
-                            {/* Assigned Centers Tags */}
-                            {assignedCenters.length > 0 && (
+                            {isAdmin ? (
                                 <div className="flex flex-wrap gap-1.5 mt-2.5">
-                                    {assignedCenters.map((centerName, idx) => (
-                                        <span key={idx} className="bg-blue-50/80 text-blue-700 border border-blue-200/60 text-[11px] font-semibold px-2 py-0.5 rounded-md shadow-2xs">
-                                            📍 {centerName}
-                                        </span>
-                                    ))}
+                                    <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold px-2 py-0.5 rounded-md shadow-2xs">
+                                        🛡️ Tous les centres (Administrateur)
+                                    </span>
                                 </div>
+                            ) : (
+                                assignedCenters.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                        {assignedCenters.map((centerName, idx) => (
+                                            <span key={idx} className="bg-blue-50/80 text-blue-700 border border-blue-200/60 text-[11px] font-semibold px-2 py-0.5 rounded-md shadow-2xs">
+                                                📍 {centerName}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>
                     <div className="flex items-center gap-3 self-end sm:self-center">
                         <NotificationBell />
+                        <button
+                            onClick={() => setIsPasswordModalOpen(true)}
+                            className="relative bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 p-2.5 rounded-2xl transition-all shadow-sm hover:shadow cursor-pointer flex items-center justify-center"
+                            type="button"
+                            aria-label="Change Password"
+                            title={t('changePassword') || 'Changer le mot de passe'}
+                        >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                        </button>
                         <LanguageSwitcher />
                         <button
                             onClick={handleLogout}
@@ -455,21 +622,30 @@ export default function TechnicianDashboard() {
                 {errorMsg && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-medium shadow-sm">{errorMsg}</div>}
 
                 {/* Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-blue-600 border-r border-y border-blue-100 shadow-xl">
                         <div className="text-blue-600 text-xs font-bold uppercase tracking-wider">{t('totalTickets')}</div>
-                        <div className="text-3xl font-black text-gray-900 mt-2">{tickets.length}</div>
+                        <div className="text-3xl font-black text-gray-900 mt-2">{filteredTickets.length}</div>
                     </div>
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-sky-500 border-r border-y border-blue-100 shadow-xl">
                         <div className="text-sky-600 text-xs font-bold uppercase tracking-wider">{t('toProcess')}</div>
                         <div className="text-3xl font-black text-sky-600 mt-2">
-                            {tickets.filter(t => t.statut === 'EN_COURS' || t.statut?.includes('NOUVEAU')).length}
+                            {filteredTickets.filter(t => t.statut === 'EN_COURS' || t.statut?.includes('NOUVEAU')).length}
                         </div>
                     </div>
                     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-emerald-500 border-r border-y border-blue-100 shadow-xl">
                         <div className="text-emerald-600 text-xs font-bold uppercase tracking-wider">{t('resolved')}</div>
                         <div className="text-3xl font-black text-emerald-600 mt-2">
-                            {tickets.filter(t => t.statut === 'RESOLU' || t.statut === 'FERME').length}
+                            {filteredTickets.filter(t => t.statut === 'RESOLU' || t.statut === 'FERME').length}
+                        </div>
+                    </div>
+                    <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-violet-500 border-r border-y border-blue-100 shadow-xl">
+                        <div className="text-violet-600 text-xs font-bold uppercase tracking-wider">{t('responseTime') || 'Temps de réponse moyen'}</div>
+                        <div className={`text-3xl font-black mt-2 ${technicianResponse.avgMs > RESPONSE_LIMIT_MS ? 'text-red-600' : 'text-violet-600'}`}>
+                            {technicianResponse.avgMs > RESPONSE_LIMIT_MS ? '⚠️ ' : '⏱️ '}{technicianResponse.label}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-1">
+                            {technicianResponse.count} {t('resolvedShort') || 'résolus / fermés'}
                         </div>
                     </div>
                 </div>
@@ -530,6 +706,7 @@ export default function TechnicianDashboard() {
                                     <th className="p-4">{t('center')}</th>
                                     <th className="p-4">{t('priority')}</th>
                                     <th className="p-4">{t('status')}</th>
+                                    <th className="p-4">{t('responseTime') || 'Temps de réponse'}</th>
                                     <th className="p-4 text-right">{t('actions')}</th>
                                 </tr>
                             </thead>
@@ -573,6 +750,7 @@ export default function TechnicianDashboard() {
                                                     {t(ticket.statut)}
                                                 </span>
                                             </td>
+                                            <td className="p-4"><ResponseTimeBadge ticket={ticket} /></td>
                                             <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <select
                                                     value={ticket.statut}
@@ -591,7 +769,7 @@ export default function TechnicianDashboard() {
                                 })}
                                 {filteredTickets.length === 0 && (
                                     <tr>
-                                        <td colSpan="6" className="p-8 text-center text-gray-400 text-sm">
+                                        <td colSpan="7" className="p-8 text-center text-gray-400 text-sm">
                                             {t('errorGeneric')}
                                         </td>
                                     </tr>
@@ -602,6 +780,94 @@ export default function TechnicianDashboard() {
                 </div>
 
             </div>
+
+            {/* Change Password Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <h3 className="font-bold text-gray-800 text-sm">{t('changePassword') || 'Changer le mot de passe'}</h3>
+                            <button 
+                                onClick={() => {
+                                    setIsPasswordModalOpen(false);
+                                    setPasswordError('');
+                                    setPasswordSuccess('');
+                                }}
+                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleChangePasswordSubmit} className="p-6 space-y-4">
+                            {passwordError && (
+                                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-medium">
+                                    {passwordError}
+                                </div>
+                            )}
+                            {passwordSuccess && (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs font-medium">
+                                    {passwordSuccess}
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                                    {t('currentPassword') || 'Ancien mot de passe'}
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordForm.ancienMotDePasse}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, ancienMotDePasse: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                                    {t('newPassword') || 'Nouveau mot de passe'}
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordForm.nouveauMotDePasse}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, nouveauMotDePasse: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                                    {t('confirmPassword') || 'Confirmer le mot de passe'}
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordForm.confirmerMotDePasse}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmerMotDePasse: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsPasswordModalOpen(false);
+                                        setPasswordError('');
+                                        setPasswordSuccess('');
+                                    }}
+                                    className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 font-medium px-4 py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                                >
+                                    {t('cancel') || 'Annuler'}
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
+                                >
+                                    {t('save') || 'Enregistrer'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Ticket Details & Comments Modal */}
             {selectedTicket && (
@@ -638,7 +904,7 @@ export default function TechnicianDashboard() {
                                 </div>
                                 <div>
                                     <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('priority')}</span>
-                                    <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${getPriorityBadge(selectedTicket.priorite)}`}>
+                                    <span className={`px-2 py-0.5 text-xs rounded-md font-medium inline-block ${getPriorityBadge(selectedTicket.priorite)}`}>
                                         {t(selectedTicket.priorite)}
                                     </span>
                                 </div>
@@ -647,10 +913,11 @@ export default function TechnicianDashboard() {
                                     <select
                                         value={newStatus}
                                         onChange={(e) => {
-                                            setNewStatus(e.target.value);
-                                            handleUpdateStatus(selectedTicket.id, e.target.value);
+                                            const val = e.target.value;
+                                            setNewStatus(val);
+                                            handleUpdateStatus(selectedTicket.id, val);
                                         }}
-                                        className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer w-full sm:w-auto"
+                                        className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-800 font-medium focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer w-full"
                                     >
                                         <option value="NOUVEAU_NON_VU">{t('NOUVEAU_NON_VU')}</option>
                                         <option value="NOUVEAU_VU">{t('NOUVEAU_VU')}</option>
@@ -661,63 +928,46 @@ export default function TechnicianDashboard() {
                                 </div>
                             </div>
 
+                            {/* Description */}
                             <div>
-                                <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('description')}</span>
-                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                                    {selectedTicket.description}
-                                </div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t('description') || 'Description'}</h3>
+                                <p className="text-sm text-gray-700 bg-gray-50/50 p-4 rounded-2xl border border-gray-100 whitespace-pre-wrap">
+                                    {selectedTicket.description || selectedTicket.message || '—'}
+                                </p>
                             </div>
 
-                            {selectedTicket.fichier_joint && (
-                                <div>
-                                    <span className="text-xs font-semibold text-gray-400 uppercase block mb-1">{t('fichierJoint')}</span>
-                                    <a 
-                                        href={selectedTicket.fichier_joint} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50/50 hover:bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-2xl transition-all"
-                                    >
-                                        <span>📎</span> {selectedTicket.fichier_joint.split('/').pop()}
-                                    </a>
-                                </div>
-                            )}
-
                             {/* Comments Section */}
-                            <div className="space-y-4 pt-4 border-t border-gray-100">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('comments') || 'Commentaires'}</h3>
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('comments') || 'Commentaires'}</h3>
                                 
-                                <div className="space-y-3">
-                                    {ticketComments.map((comment, index) => (
-                                        <div key={comment.id || index} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-1">
-                                            <div className="flex justify-between items-center text-xs">
-                                                <span className="font-semibold text-gray-700">
-                                                    {comment.auteur?.prenom && comment.auteur?.nom 
-                                                        ? `${comment.auteur.prenom} ${comment.auteur.nom}` 
-                                                        : (comment.auteur?.email || comment.user?.prenom || t('unknownUser') || 'Utilisateur')}
-                                                </span>
-                                                <span className="text-gray-400 font-mono">
-                                                    {(comment.dateCreation || comment.createdAt) ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() : ''}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm text-gray-800">{comment.contenu || comment.texte || comment.content}</p>
-                                        </div>
-                                    ))}
-                                    {ticketComments.length === 0 && (
+                                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                                    {ticketComments.length === 0 ? (
                                         <p className="text-xs text-gray-400 italic">{t('noComments') || 'Aucun commentaire pour le moment.'}</p>
+                                    ) : (
+                                        ticketComments.map((comment, idx) => (
+                                            <div key={comment.id || idx} className="bg-gray-50 border border-gray-100 rounded-2xl p-3.5 text-xs space-y-1">
+                                                <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium">
+                                                    <span>{comment.employe?.nom || comment.utilisateur?.nom || comment.auteur || 'Utilisateur'}</span>
+                                                    <span>{new Date(comment.createdAt || comment.dateCreation || Date.now()).toLocaleString()}</span>
+                                                </div>
+                                                <p className="text-gray-800">{comment.contenu || comment.texte}</p>
+                                            </div>
+                                        ))
                                     )}
                                 </div>
 
+                                {/* Add Comment Form */}
                                 <form onSubmit={handleAddComment} className="flex gap-2 pt-2">
                                     <input
                                         type="text"
-                                        placeholder={t('writeCommentPlaceholder') || 'Écrire un commentaire...'}
+                                        placeholder={t('writeComment') || 'Écrire un commentaire...'}
                                         value={newComment}
                                         onChange={(e) => setNewComment(e.target.value)}
-                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
+                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
                                     />
                                     <button
                                         type="submit"
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-2xl text-sm transition-all shadow-md cursor-pointer shrink-0"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
                                     >
                                         {t('send') || 'Envoyer'}
                                     </button>
@@ -726,10 +976,10 @@ export default function TechnicianDashboard() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
                             <button
                                 onClick={() => setSelectedTicket(null)}
-                                className="bg-gray-900 hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl text-xs transition-all cursor-pointer"
+                                className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 font-medium px-5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
                             >
                                 {t('close') || 'Fermer'}
                             </button>

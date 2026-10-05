@@ -201,13 +201,13 @@ export default function EmployeeDashboard() {
     const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
     const [centers, setCenters] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
     const [titre, setTitre] = useState('');
     const [description, setDescription] = useState('');
     const [priorite, setPriorite] = useState('MOYENNE');
-    const [centerId, setCenterId] = useState('');
     const [fichierJoint, setFichierJoint] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -217,63 +217,53 @@ export default function EmployeeDashboard() {
     const [ticketComments, setTicketComments] = useState([]);
     const [newComment, setNewComment] = useState('');
 
+    // Change Password States
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+
     const navigate = useNavigate();
 
-    const extractLabel = (item) => {
-        if (!item) return '';
-        if (typeof item === 'string') return item;
-        return item.nom || item.libelle || item.name || item.title || item.code || JSON.stringify(item);
-    };
+    // Enhanced center name resolver matching against fetched centers list or user object
+    const getCenterName = useCallback((input) => {
+        if (!input) return '';
 
-    const extractId = (item) => {
-        if (!item) return '';
-        if (typeof item !== 'object') return item;
-        return item.id || item._id || item.code || item.nom || '';
-    };
+        if (typeof input === 'object') {
+            const directName = input.nom || input.libelle || input.name || input.title || input.ville || input.centerName;
+            if (directName && directName.toLowerCase() !== 'ufc') {
+                return directName;
+            }
+            
+            const nested = input.centre || input.center || input.employe?.centre || input.employe?.center;
+            if (nested) {
+                if (typeof nested === 'object') {
+                    const nName = nested.nom || nested.libelle || nested.name || nested.ville;
+                    if (nName) return nName;
+                } else if (centers.length > 0) {
+                    const match = centers.find(c => String(c.id || c._id) === String(nested));
+                    if (match) return match.nom || match.libelle || match.name || match.ville;
+                }
+            }
 
-    const getCenterName = useCallback((ticketOrCenterInput) => {
-        let centerInput = ticketOrCenterInput;
-        if (ticketOrCenterInput && typeof ticketOrCenterInput === 'object') {
-            centerInput = 
-                ticketOrCenterInput.centre || 
-                ticketOrCenterInput.center || 
-                ticketOrCenterInput.employe?.centre || 
-                ticketOrCenterInput.employe?.center || 
-                ticketOrCenterInput.centreId || 
-                ticketOrCenterInput.centerId || 
-                ticketOrCenterInput.centre_id || 
-                ticketOrCenterInput.center_id;
-        }
-        if (!centerInput) return '';
-
-        let centerObj = centerInput;
-        
-        if (centerInput && typeof centerInput !== 'object') {
-            const found = centers.find(c => String(c.id || c._id) === String(centerInput));
-            if (found) centerObj = found;
+            const centerIdVal = input.centreId || input.centerId || input.centre_id || input.center_id || input.id;
+            if (centers.length > 0 && centerIdVal) {
+                const found = centers.find(c => String(c.id || c._id) === String(centerIdVal));
+                if (found) return found.nom || found.libelle || found.name || found.ville;
+            }
         }
 
-        const rawName = typeof centerObj === 'object' 
-            ? (centerObj.nom || centerObj.libelle || centerObj.name || centerObj.title || '') 
-            : String(centerObj);
-
-        if (!rawName || (rawName === String(centerInput) && rawName.length > 20)) {
-            return '';
+        if (centers.length > 0) {
+            const foundById = centers.find(c => String(c.id || c._id) === String(input));
+            if (foundById) return foundById.nom || foundById.libelle || foundById.name || foundById.ville;
         }
 
-        const trimmedKey = rawName.trim();
-        const translated = t(trimmedKey);
-        return translated !== trimmedKey ? translated : trimmedKey;
-    }, [centers, t]);
+        return typeof input === 'string' ? input : '';
+    }, [centers]);
 
     const fetchData = useCallback(async () => {
-        try {
-            const ticketRes = await api.get('/tickets');
-            setTickets(ticketRes.data.data || ticketRes.data || []);
-        } catch (err) {
-            console.error("Error fetching tickets:", err);
-        }
-
         try {
             let centerRes;
             try {
@@ -294,9 +284,25 @@ export default function EmployeeDashboard() {
             setCenters(Array.isArray(centerList) ? centerList : []);
         } catch (err) {
             console.error("Error fetching centers:", err);
-            setErrorMsg(t('errorGeneric'));
         }
-    }, [t]);
+
+        try {
+            const userRes = await api.get('/auth/me').catch(() => api.get('/users/me').catch(() => null));
+            if (userRes) {
+                const userData = userRes.data?.data || userRes.data;
+                setCurrentUser(userData);
+            }
+        } catch (err) {
+            console.error("Error fetching current user profile:", err);
+        }
+
+        try {
+            const ticketRes = await api.get('/tickets');
+            setTickets(ticketRes.data.data || ticketRes.data || []);
+        } catch (err) {
+            console.error("Error fetching tickets:", err);
+        }
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -328,11 +334,21 @@ export default function EmployeeDashboard() {
         setSuccessMsg('');
 
         try {
+            const resolvedCenterId = 
+                currentUser?.centreId || 
+                currentUser?.centerId || 
+                currentUser?.centre?.id || 
+                currentUser?.center?.id || 
+                currentUser?.centre_id || 
+                currentUser?.center_id || '';
+
             const formData = new FormData();
             formData.append('titre', titre);
             formData.append('description', description);
             formData.append('priorite', priorite);
-            formData.append('centerId', centerId || '');
+            if (resolvedCenterId) {
+                formData.append('centerId', resolvedCenterId);
+            }
 
             if (fichierJoint) {
                 formData.append('fichier', fichierJoint);
@@ -344,11 +360,10 @@ export default function EmployeeDashboard() {
                 }
             });
 
-            setSuccessMsg(t('successTicketCreated'));
+            setSuccessMsg(t('successTicketCreated') || 'Ticket created successfully.');
             setTitre('');
             setDescription('');
             setPriorite('MOYENNE');
-            setCenterId('');
             setFichierJoint(null);
             fetchData();
         } catch (err) {
@@ -388,6 +403,35 @@ export default function EmployeeDashboard() {
         }
     };
 
+    const handleChangePasswordSubmit = async (e) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess('');
+
+        if (newPassword !== confirmPassword) {
+            setPasswordError(t('passwordsDontMatch') || 'New passwords do not match.');
+            return;
+        }
+
+        try {
+            await api.put('/auth/change-password', {
+                oldPassword,
+                newPassword
+            });
+            setPasswordSuccess(t('passwordChangedSuccess') || 'Password changed successfully.');
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setTimeout(() => {
+                setIsPasswordModalOpen(false);
+                setPasswordSuccess('');
+            }, 2000);
+        } catch (err) {
+            console.error('Error changing password:', err.response?.data || err);
+            setPasswordError(err.response?.data?.message || t('errorGeneric'));
+        }
+    };
+
     const handleLogout = () => {
         localStorage.clear();
         navigate('/login');
@@ -421,8 +465,17 @@ export default function EmployeeDashboard() {
                             <p className="text-sm text-gray-500">{t('dashboardSubtitle')}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <NotificationBell />
+                        <button
+                            onClick={() => setIsPasswordModalOpen(true)}
+                            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 p-2.5 rounded-2xl transition-all shadow-sm hover:shadow cursor-pointer flex items-center justify-center"
+                            title={t('changePassword') || 'Changer le mot de passe'}
+                        >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                        </button>
                         <LanguageSwitcher />
                         <button
                             onClick={handleLogout}
@@ -438,9 +491,16 @@ export default function EmployeeDashboard() {
 
                 {/* New Ticket Form */}
                 <div className="bg-white/95 backdrop-blur-sm rounded-3xl border border-blue-100 shadow-xl p-8 space-y-6">
-                    <h2 className="text-lg font-bold text-gray-900">{t('reportIncident')}</h2>
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-bold text-gray-900">{t('reportIncident')}</h2>
+                        {getCenterName(currentUser) && (
+                            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                {t('center') || 'Center'}: {getCenterName(currentUser)}
+                            </span>
+                        )}
+                    </div>
                     <form onSubmit={handleCreateTicket} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('ticketTitle')}</label>
                             <input
                                 type="text"
@@ -450,26 +510,6 @@ export default function EmployeeDashboard() {
                                 onChange={(e) => setTitre(e.target.value)}
                                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
                             />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('center') || 'Center'}</label>
-                            <select
-                                required
-                                value={centerId}
-                                onChange={(e) => setCenterId(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
-                            >
-                                <option value="">{t('selectCenter') || 'Select Center'}</option>
-                                {centers.map((center, index) => {
-                                    const centerVal = extractId(center);
-                                    const centerLabel = extractLabel(center);
-                                    return (
-                                        <option key={centerVal || index} value={centerVal}>
-                                            {t(centerLabel) !== centerLabel ? t(centerLabel) : centerLabel}
-                                        </option>
-                                    );
-                                })}
-                            </select>
                         </div>
                         <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('priority')}</label>
@@ -627,6 +667,73 @@ export default function EmployeeDashboard() {
 
             </div>
 
+            {/* Change Password Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <h3 className="font-bold text-gray-900 text-sm">{t('changePassword') || 'Changer le mot de passe'}</h3>
+                            <button 
+                                onClick={() => setIsPasswordModalOpen(false)}
+                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleChangePasswordSubmit} className="p-6 space-y-4">
+                            {passwordError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">{passwordError}</div>}
+                            {passwordSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium">{passwordSuccess}</div>}
+                            
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('oldPassword') || 'Ancien mot de passe'}</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={oldPassword}
+                                    onChange={(e) => setOldPassword(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('newPassword') || 'Nouveau mot de passe'}</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('confirmPassword') || 'Confirmer le mot de passe'}</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPasswordModalOpen(false)}
+                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer"
+                                >
+                                    {t('cancel') || 'Annuler'}
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+                                >
+                                    {t('save') || 'Enregistrer'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Ticket Details Modal */}
             {selectedTicket && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -696,9 +803,9 @@ export default function EmployeeDashboard() {
                                                 <span className="font-semibold text-gray-800">
                                                     {comment.auteur?.nom || comment.user?.prenom || comment.author || t('user')}
                                                 </span>
-                                               {(comment.dateCreation || comment.createdAt) 
-                            ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() 
-                            : ''}
+                                                {(comment.dateCreation || comment.createdAt) 
+                                                    ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() 
+                                                    : ''}
                                             </div>
                                             <p className="text-sm text-gray-700">{comment.contenu || comment.texte || comment.content}</p>
                                         </div>
