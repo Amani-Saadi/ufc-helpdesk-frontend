@@ -20,11 +20,11 @@ function NotificationBell() {
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await api.get('/notifications');
-      if (res.data?.status === 'success' || Array.isArray(res.data?.data) || Array.isArray(res.data)) {
-        setNotifications(res.data.data || res.data);
-      }
+      const data = res.data?.data || res.data;
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
+      setNotifications([]);
     }
   }, []);
 
@@ -83,7 +83,7 @@ function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unreadCount = notifications.filter((n) => !n.estLue).length;
+  const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.estLue).length : 0;
 
   return (
     <div className="relative">
@@ -94,18 +94,8 @@ function NotificationBell() {
         type="button"
         aria-label="Notifications"
       >
-        <svg
-          className="w-5 h-5 text-gray-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
+        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
 
         {unreadCount > 0 && (
@@ -124,17 +114,14 @@ function NotificationBell() {
           <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-800 text-sm">{t('notifications')}</h3>
             {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-              >
+              <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer">
                 {t('markAllAsRead') || 'Tout marquer comme lu'}
               </button>
             )}
           </div>
 
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-            {notifications.length === 0 ? (
+            {(!Array.isArray(notifications) || notifications.length === 0) ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 {t('noNotifications') || 'Aucune notification'}
               </div>
@@ -167,47 +154,39 @@ function NotificationBell() {
 
 const getStatusBadge = (statut) => {
     switch (statut) {
-        case 'NOUVEAU_NON_VU':
-            return 'bg-amber-50 text-amber-700 border border-amber-200/60 shadow-2xs';
-        case 'NOUVEAU_VU':
-            return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
-        case 'EN_COURS':
-            return 'bg-sky-50 text-sky-700 border border-sky-200/60 shadow-2xs';
-        case 'RESOLU':
-            return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs';
-        case 'FERME':
-            return 'bg-slate-100 text-slate-600 border border-slate-200/60 shadow-2xs';
-        default:
-            return 'bg-slate-100 text-slate-700';
+        case 'NOUVEAU_NON_VU': return 'bg-amber-50 text-amber-700 border border-amber-200/60 shadow-2xs';
+        case 'NOUVEAU_VU': return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
+        case 'EN_COURS': return 'bg-sky-50 text-sky-700 border border-sky-200/60 shadow-2xs';
+        case 'RESOLU': return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs';
+        case 'FERME': return 'bg-slate-100 text-slate-600 border border-slate-200/60 shadow-2xs';
+        default: return 'bg-slate-100 text-slate-700';
     }
 };
 
 const getPriorityBadge = (priorite) => {
     switch (priorite) {
-        case 'URGENTE':
-            return 'bg-red-50 text-red-700 font-bold border border-red-200/60 shadow-2xs animate-pulse';
-        case 'HAUTE':
-            return 'bg-orange-50 text-orange-700 border border-orange-200/60 shadow-2xs';
-        case 'MOYENNE':
-            return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
-        case 'BASSE':
-            return 'bg-slate-50 text-slate-600 border border-slate-200/60 shadow-2xs';
-        default:
-            return 'bg-slate-100 text-slate-700';
+        case 'URGENTE': return 'bg-red-50 text-red-700 font-bold border border-red-200/60 shadow-2xs animate-pulse';
+        case 'HAUTE': return 'bg-orange-50 text-orange-700 border border-orange-200/60 shadow-2xs';
+        case 'MOYENNE': return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
+        case 'BASSE': return 'bg-slate-50 text-slate-600 border border-slate-200/60 shadow-2xs';
+        default: return 'bg-slate-100 text-slate-700';
     }
 };
 
 export default function EmployeeDashboard() {
-    const { t, formatId } = useLanguage();
+    const languageHook = useLanguage();
+    const t = languageHook?.t || ((key) => key);
+    const formatId = languageHook?.formatId || ((id) => id);
+
     const [tickets, setTickets] = useState([]);
     const [centers, setCenters] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
     const [titre, setTitre] = useState('');
     const [description, setDescription] = useState('');
     const [priorite, setPriorite] = useState('MOYENNE');
-    const [centerId, setCenterId] = useState('');
     const [fichierJoint, setFichierJoint] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -219,61 +198,37 @@ export default function EmployeeDashboard() {
 
     const navigate = useNavigate();
 
-    const extractLabel = (item) => {
-        if (!item) return '';
-        if (typeof item === 'string') return item;
-        return item.nom || item.libelle || item.name || item.title || item.code || JSON.stringify(item);
-    };
-
-    const extractId = (item) => {
-        if (!item) return '';
-        if (typeof item !== 'object') return item;
-        return item.id || item._id || item.code || item.nom || '';
-    };
-
-    const getCenterName = useCallback((ticketOrCenterInput) => {
-        let centerInput = ticketOrCenterInput;
-        if (ticketOrCenterInput && typeof ticketOrCenterInput === 'object') {
-            centerInput = 
-                ticketOrCenterInput.centre || 
-                ticketOrCenterInput.center || 
-                ticketOrCenterInput.employe?.centre || 
-                ticketOrCenterInput.employe?.center || 
-                ticketOrCenterInput.centreId || 
-                ticketOrCenterInput.centerId || 
-                ticketOrCenterInput.centre_id || 
-                ticketOrCenterInput.center_id;
+    const getCenterName = useCallback((input) => {
+        if (!input) return '';
+        if (typeof input === 'object') {
+            const directName = input.nom || input.libelle || input.name || input.title || input.ville || input.centerName;
+            if (directName && directName.toLowerCase() !== 'ufc') {
+                return directName;
+            }
+            const nested = input.centre || input.center || input.employe?.centre || input.employe?.center;
+            if (nested) {
+                if (typeof nested === 'object') {
+                    const nName = nested.nom || nested.libelle || nested.name || nested.ville;
+                    if (nName) return nName;
+                } else if (centers.length > 0) {
+                    const match = centers.find(c => String(c.id || c._id) === String(nested));
+                    if (match) return match.nom || match.libelle || match.name || match.ville;
+                }
+            }
+            const centerIdVal = input.centreId || input.centerId || input.centre_id || input.center_id || input.id;
+            if (centers.length > 0 && centerIdVal) {
+                const found = centers.find(c => String(c.id || c._id) === String(centerIdVal));
+                if (found) return found.nom || found.libelle || found.name || found.ville;
+            }
         }
-        if (!centerInput) return '';
-
-        let centerObj = centerInput;
-        
-        if (centerInput && typeof centerInput !== 'object') {
-            const found = centers.find(c => String(c.id || c._id) === String(centerInput));
-            if (found) centerObj = found;
+        if (centers.length > 0) {
+            const foundById = centers.find(c => String(c.id || c._id) === String(input));
+            if (foundById) return foundById.nom || foundById.libelle || foundById.name || foundById.ville;
         }
-
-        const rawName = typeof centerObj === 'object' 
-            ? (centerObj.nom || centerObj.libelle || centerObj.name || centerObj.title || '') 
-            : String(centerObj);
-
-        if (!rawName || (rawName === String(centerInput) && rawName.length > 20)) {
-            return '';
-        }
-
-        const trimmedKey = rawName.trim();
-        const translated = t(trimmedKey);
-        return translated !== trimmedKey ? translated : trimmedKey;
-    }, [centers, t]);
+        return typeof input === 'string' ? input : '';
+    }, [centers]);
 
     const fetchData = useCallback(async () => {
-        try {
-            const ticketRes = await api.get('/tickets');
-            setTickets(ticketRes.data.data || ticketRes.data || []);
-        } catch (err) {
-            console.error("Error fetching tickets:", err);
-        }
-
         try {
             let centerRes;
             try {
@@ -285,27 +240,35 @@ export default function EmployeeDashboard() {
                     centerRes = await api.get('/api/centers');
                 }
             }
-
             const rawData = centerRes?.data;
-            const centerList = Array.isArray(rawData) 
-                ? rawData 
-                : (rawData?.data || rawData?.centers || rawData?.centres || rawData?.list || []);
-            
+            const centerList = Array.isArray(rawData) ? rawData : (rawData?.data || rawData?.centers || rawData?.centres || rawData?.list || []);
             setCenters(Array.isArray(centerList) ? centerList : []);
         } catch (err) {
             console.error("Error fetching centers:", err);
-            setErrorMsg(t('errorGeneric'));
         }
-    }, [t]);
+
+        try {
+            const userRes = await api.get('/auth/me').catch(() => api.get('/users/me').catch(() => null));
+            if (userRes) {
+                const userData = userRes.data?.data || userRes.data;
+                setCurrentUser(userData);
+            }
+        } catch (err) {
+            console.error("Error fetching current user profile:", err);
+        }
+
+        try {
+            const ticketRes = await api.get('/tickets');
+            const ticketData = ticketRes.data?.data || ticketRes.data;
+            setTickets(Array.isArray(ticketData) ? ticketData : []);
+        } catch (err) {
+            console.error("Error fetching tickets:", err);
+            setTickets([]);
+        }
+    }, []);
 
     useEffect(() => {
-        let isMounted = true;
-        const load = async () => {
-            await fetchData();
-            if (!isMounted) return;
-        };
-        load();
-        return () => { isMounted = false; };
+        fetchData();
     }, [fetchData]);
 
     useEffect(() => {
@@ -315,7 +278,8 @@ export default function EmployeeDashboard() {
         }
         api.get(`/tickets/${selectedTicket.id}/commentaires`)
             .then(res => {
-                setTicketComments(res.data.data || res.data || []);
+                const commentsData = res.data?.data || res.data;
+                setTicketComments(Array.isArray(commentsData) ? commentsData : []);
             })
             .catch(() => {
                 setTicketComments([]);
@@ -332,23 +296,19 @@ export default function EmployeeDashboard() {
             formData.append('titre', titre);
             formData.append('description', description);
             formData.append('priorite', priorite);
-            formData.append('centerId', centerId || '');
 
             if (fichierJoint) {
                 formData.append('fichier', fichierJoint);
             }
 
             await api.post('/tickets', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            setSuccessMsg(t('successTicketCreated'));
+            setSuccessMsg(t('successTicketCreated') || 'Ticket created successfully.');
             setTitre('');
             setDescription('');
             setPriorite('MOYENNE');
-            setCenterId('');
             setFichierJoint(null);
             fetchData();
         } catch (err) {
@@ -379,8 +339,10 @@ export default function EmployeeDashboard() {
                 texte: newComment 
             });
 
-            const addedComment = res.data.data || res.data;
-            setTicketComments(prev => [...prev, addedComment]);
+            const addedComment = res.data?.data || res.data;
+            if (addedComment) {
+                setTicketComments(prev => [...prev, addedComment]);
+            }
             setNewComment('');
         } catch (err) {
             console.error("Erreur lors de l'envoi du commentaire:", err.response?.data || err.message);
@@ -393,14 +355,13 @@ export default function EmployeeDashboard() {
         navigate('/login');
     };
 
-    const filteredTickets = tickets.filter(ticket => {
+    const filteredTickets = Array.isArray(tickets) ? tickets.filter(ticket => {
         const matchesSearch =
-            ticket.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ticket.id?.toString().includes(searchTerm);
+            (ticket.titre && ticket.titre.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (ticket.id && ticket.id.toString().includes(searchTerm));
         const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
-
         return matchesSearch && matchesStatus;
-    });
+    }) : [];
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -438,9 +399,16 @@ export default function EmployeeDashboard() {
 
                 {/* New Ticket Form */}
                 <div className="bg-white/95 backdrop-blur-sm rounded-3xl border border-blue-100 shadow-xl p-8 space-y-6">
-                    <h2 className="text-lg font-bold text-gray-900">{t('reportIncident')}</h2>
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-bold text-gray-900">{t('reportIncident')}</h2>
+                        {getCenterName(currentUser) && (
+                            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                {t('center') || 'Center'}: {getCenterName(currentUser)}
+                            </span>
+                        )}
+                    </div>
                     <form onSubmit={handleCreateTicket} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('ticketTitle')}</label>
                             <input
                                 type="text"
@@ -450,26 +418,6 @@ export default function EmployeeDashboard() {
                                 onChange={(e) => setTitre(e.target.value)}
                                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm"
                             />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('center') || 'Center'}</label>
-                            <select
-                                required
-                                value={centerId}
-                                onChange={(e) => setCenterId(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none shadow-sm cursor-pointer"
-                            >
-                                <option value="">{t('selectCenter') || 'Select Center'}</option>
-                                {centers.map((center, index) => {
-                                    const centerVal = extractId(center);
-                                    const centerLabel = extractLabel(center);
-                                    return (
-                                        <option key={centerVal || index} value={centerVal}>
-                                            {t(centerLabel) !== centerLabel ? t(centerLabel) : centerLabel}
-                                        </option>
-                                    );
-                                })}
-                            </select>
                         </div>
                         <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">{t('priority')}</label>
@@ -632,7 +580,6 @@ export default function EmployeeDashboard() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         
-                        {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <span className="text-xs font-mono font-bold text-gray-400">#{formatId(selectedTicket.id)}</span>
                             <button 
@@ -643,7 +590,6 @@ export default function EmployeeDashboard() {
                             </button>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="p-6 overflow-y-auto space-y-6 flex-1">
                             <h2 className="text-xl font-bold text-gray-900">{selectedTicket.titre}</h2>
 
@@ -690,20 +636,20 @@ export default function EmployeeDashboard() {
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('comments') || 'Comments'}</h3>
                                 
                                 <div className="space-y-3">
-                                    {ticketComments.map((comment, idx) => (
+                                    {Array.isArray(ticketComments) && ticketComments.map((comment, idx) => (
                                         <div key={comment.id || idx} className="bg-gray-50 border border-gray-100 p-4 rounded-2xl space-y-1">
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="font-semibold text-gray-800">
                                                     {comment.auteur?.nom || comment.user?.prenom || comment.author || t('user')}
                                                 </span>
-                                               {(comment.dateCreation || comment.createdAt) 
-                            ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() 
-                            : ''}
+                                                {(comment.dateCreation || comment.createdAt) 
+                                                    ? new Date(comment.dateCreation || comment.createdAt).toLocaleDateString() 
+                                                    : ''}
                                             </div>
                                             <p className="text-sm text-gray-700">{comment.contenu || comment.texte || comment.content}</p>
                                         </div>
                                     ))}
-                                    {ticketComments.length === 0 && (
+                                    {(!Array.isArray(ticketComments) || ticketComments.length === 0) && (
                                         <p className="text-xs text-gray-400 italic">{t('noComments') || 'No comments yet.'}</p>
                                     )}
                                 </div>
@@ -726,7 +672,6 @@ export default function EmployeeDashboard() {
                             </div>
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
                             {selectedTicket.statut !== 'FERME' && (
                                 <button

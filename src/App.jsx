@@ -9,7 +9,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/employee" element={<EmployeeDashboard />} />
+      <Route path="/centre" element={<EmployeeDashboard />} />
         <Route path="/technician" element={<TechnicianDashboard />} />
         <Route path="/admin" element={<AdminDashboard />} /> {/* <--- 2. Add the admin route */}
         <Route path="*" element={<Navigate to="/login" replace />} />
