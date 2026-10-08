@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -8,99 +7,24 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 
 export default function Login() {
-    const { t } = useLanguage();
-
-    const [emailInput, setEmailInput] = useState('');
+    const { t } = useLanguage(); 
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false); // State for eye toggle
     const [error, setError] = useState('');
-<<<<<<< HEAD
-    const [isLoading, setIsLoading] = useState(false);
-
-=======
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
-<<<<<<< HEAD
-
-        // Prevent accidental double submission
-        if (isLoading) {
-            return;
-        }
-
-        setError('');
-        setIsLoading(true);
-
-        // Remove accidental spaces around email/password
-        const cleanEmail = emailInput.trim();
-        const cleanPassword = password.trim();
-
-        console.log('LOGIN DEBUG:', {
-            email: cleanEmail,
-            passwordLength: cleanPassword.length,
-            passwordChars: [...cleanPassword].map((c) =>
-                c.charCodeAt(0)
-            )
-        });
-
-=======
         setError('');
         
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
         try {
             const response = await api.post('/auth/login', {
-                email: cleanEmail,
-                motDePasse: cleanPassword
+                email,
+                motDePasse: password
             });
 
-<<<<<<< HEAD
-            console.log('FULL RESPONSE DATA:', response.data);
-
-            // Get token from backend response
-            const token =
-                response.data?.token ||
-                response.data?.accessToken ||
-                response.data?.data?.token;
-
-            // Backend returns "utilisateur"
-            const user =
-                response.data?.utilisateur ||
-                response.data?.user ||
-                response.data?.data?.utilisateur ||
-                response.data?.data?.user;
-
-            console.log('USER OBJECT:', user);
-
-            console.log(
-                'UTILISATEUR CONTENT:',
-                JSON.stringify(user, null, 2)
-            );
-
-            if (!token) {
-                setError(
-                    'الباك إند لم يرسل التوكن! تحقق من شكل الاستجابة في الـ Console.'
-                );
-                return;
-            }
-
-            if (!user) {
-                setError(
-                    'Connexion réussie, mais les informations utilisateur sont absentes de la réponse du serveur.'
-                );
-
-                console.error(
-                    'USER OBJECT IS UNDEFINED. Backend response:',
-                    response.data
-                );
-
-                return;
-            }
-
-            // Save authentication information
-=======
             // Extract data handling flexible backend naming conventions (user/utilisateur, token/accessToken)
             const responseData = response.data;
             const token = responseData.token || responseData.accessToken;
@@ -114,59 +38,11 @@ export default function Login() {
                 throw new Error("Token missing from server response");
             }
 
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             localStorage.setItem('token', token);
             if (user) {
                 localStorage.setItem('user', JSON.stringify(user));
             }
 
-<<<<<<< HEAD
-            // Get user's email
-            const userEmail = (
-                user?.email ||
-                user?.emailUtilisateur ||
-                cleanEmail ||
-                ''
-            )
-                .trim()
-                .toLowerCase();
-
-            // Get user's role
-            const role = (
-                user?.role ||
-                user?.type ||
-                user?.typeUtilisateur ||
-                user?.roleUtilisateur ||
-                ''
-            )
-                .trim()
-                .toUpperCase();
-
-            console.log('DETECTED ROLE/EMAIL:', {
-                role,
-                userEmail,
-                user
-            });
-
-            /*
-             * ============================
-             * REDIRECTION
-             * ============================
-             */
-
-            // ADMIN
-            if (
-                role.includes('ADMIN') ||
-                userEmail.includes('admin')
-            ) {
-                console.log('REDIRECT → /admin');
-
-                navigate('/admin', {
-                    replace: true
-                });
-
-                return;
-=======
             // Normalize role, name, and email for safe fallback checks
             const role = user?.role?.toUpperCase() || '';
             const userName = (user?.nom || user?.name || user?.fullName || '').toLowerCase();
@@ -201,84 +77,28 @@ export default function Login() {
                 navigate('/admin');
             } else {
                 navigate('/employee');
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             }
-
-            // TECHNICIEN
-            if (
-                role.includes('TECH') ||
-                userEmail.includes('tech')
-            ) {
-                console.log('REDIRECT → /technician');
-
-                navigate('/technician', {
-                    replace: true
-                });
-
-                return;
-            }
-
-            // EMPLOYÉ / CENTRE
-            if (
-                role.includes('EMPLOYE') ||
-                role.includes('EMPLOYEE') ||
-                role.includes('CENTRE')
-            ) {
-                console.log('REDIRECT → /centre');
-
-                navigate('/centre', {
-                    replace: true
-                });
-
-                return;
-            }
-
-            // Unknown role
-            console.error('UNKNOWN USER ROLE:', {
-                role,
-                userEmail,
-                user
-            });
-
-            setError(
-                `Rôle utilisateur non reconnu : ${role || 'aucun rôle'}`
-            );
-
         } catch (err) {
-<<<<<<< HEAD
-            console.error(
-                'LOGIN ERROR DETAILS:',
-                err.response || err
-            );
-
-            setError(
-                err.response?.data?.message ||
-                t('errorCredentials')
-            );
-        } finally {
-            setIsLoading(false);
-=======
             console.error("Login error:", err);
             setError(err.response?.data?.message || err.message || t('errorCredentials'));
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
         }
     };
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-4 relative">
 
-            {/* Language Switcher */}
+            {/* Language Switcher Positioned at the Top Right/Corner */}
             <div className="absolute top-6 right-6">
                 <LanguageSwitcher />
             </div>
 
-            {/* Login Card */}
+            {/* Centered White Rounded Card Box with Brand Accent Border */}
             <div className="bg-white/95 backdrop-blur-md w-full max-w-md p-8 sm:p-10 rounded-3xl shadow-2xl border-t-4 border-t-blue-600 border-x border-b border-blue-100 relative space-y-6">
 
-                {/* Header */}
+                {/* Header & Logo Section */}
                 <div className="flex flex-col items-center text-center border-b border-gray-100 pb-5 space-y-3">
 
-                    {/* UFC Logo */}
+                    {/* UFC Logo Container */}
                     <div className="w-16 h-16 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-md p-1.5 overflow-hidden">
                         <img
                             src={logoUfc}
@@ -288,69 +108,32 @@ export default function Login() {
                     </div>
 
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                            {t('loginTitle')}
-                        </h2>
-
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            {t('loginSubtitle')}
-                        </p>
+                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">{t('loginTitle')}</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">{t('loginSubtitle')}</p>
                     </div>
                 </div>
 
-                {/* Error */}
                 {error && (
                     <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl font-medium text-center shadow-2xs">
                         {error}
                     </div>
                 )}
 
-                {/* Login Form */}
-                <form
-                    onSubmit={handleLogin}
-                    className="space-y-4"
-                >
-
-                    {/* Email */}
+                <form onSubmit={handleLogin} className="space-y-4">
+                    {/* Email Input */}
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
-                            {t('emailAddress')}
-                        </label>
-
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">{t('emailAddress')}</label>
                         <input
                             type="email"
                             autoComplete="email"
-                            value={emailInput}
-                            onChange={(e) =>
-                                setEmailInput(e.target.value)
-                            }
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
-                            disabled={isLoading}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all shadow-sm disabled:opacity-60"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all shadow-sm"
                             placeholder="nom.prenom@ufc.dz"
                         />
                     </div>
 
-<<<<<<< HEAD
-                    {/* Password */}
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
-                            {t('password')}
-                        </label>
-
-                        <input
-                            type="password"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(e) =>
-                                setPassword(e.target.value)
-                            }
-                            required
-                            disabled={isLoading}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all shadow-sm disabled:opacity-60"
-                            placeholder="••••••••"
-                        />
-=======
                     {/* Password Input with Eye Toggle */}
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">{t('password')}</label>
@@ -384,21 +167,17 @@ export default function Login() {
                                 )}
                             </button>
                         </div>
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                     </div>
 
-                    {/* Login Button */}
+                    {/* Action Button */}
                     <button
                         type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-blue-900 hover:bg-blue-800 active:scale-[0.99] disabled:bg-blue-700 disabled:opacity-70 text-white py-3.5 rounded-2xl font-semibold text-sm transition-all shadow-lg shadow-blue-900/25 cursor-pointer disabled:cursor-not-allowed mt-3"
+                        className="w-full bg-blue-900 hover:bg-blue-800 active:scale-[0.99] text-white py-3.5 rounded-2xl font-semibold text-sm transition-all shadow-lg shadow-blue-900/25 cursor-pointer mt-3"
                     >
-                        {isLoading
-                            ? 'Connexion...'
-                            : t('signIn')}
+                        {t('signIn')}
                     </button>
-
                 </form>
+
             </div>
 
             {/* Change Password Modal (Included if triggered from here) */}

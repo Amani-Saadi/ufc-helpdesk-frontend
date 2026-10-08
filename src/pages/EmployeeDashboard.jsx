@@ -20,11 +20,11 @@ function NotificationBell() {
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await api.get('/notifications');
-      const data = res.data?.data || res.data;
-      setNotifications(Array.isArray(data) ? data : []);
+      if (res.data?.status === 'success' || Array.isArray(res.data?.data) || Array.isArray(res.data)) {
+        setNotifications(res.data.data || res.data);
+      }
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
-      setNotifications([]);
     }
   }, []);
 
@@ -83,7 +83,7 @@ function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.estLue).length : 0;
+  const unreadCount = notifications.filter((n) => !n.estLue).length;
 
   return (
     <div className="relative">
@@ -94,8 +94,18 @@ function NotificationBell() {
         type="button"
         aria-label="Notifications"
       >
-        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        <svg
+          className="w-5 h-5 text-gray-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
         </svg>
 
         {unreadCount > 0 && (
@@ -114,14 +124,17 @@ function NotificationBell() {
           <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-800 text-sm">{t('notifications')}</h3>
             {unreadCount > 0 && (
-              <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer">
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+              >
                 {t('markAllAsRead') || 'Tout marquer comme lu'}
               </button>
             )}
           </div>
 
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-            {(!Array.isArray(notifications) || notifications.length === 0) ? (
+            {notifications.length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 {t('noNotifications') || 'Aucune notification'}
               </div>
@@ -154,30 +167,38 @@ function NotificationBell() {
 
 const getStatusBadge = (statut) => {
     switch (statut) {
-        case 'NOUVEAU_NON_VU': return 'bg-amber-50 text-amber-700 border border-amber-200/60 shadow-2xs';
-        case 'NOUVEAU_VU': return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
-        case 'EN_COURS': return 'bg-sky-50 text-sky-700 border border-sky-200/60 shadow-2xs';
-        case 'RESOLU': return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs';
-        case 'FERME': return 'bg-slate-100 text-slate-600 border border-slate-200/60 shadow-2xs';
-        default: return 'bg-slate-100 text-slate-700';
+        case 'NOUVEAU_NON_VU':
+            return 'bg-amber-50 text-amber-700 border border-amber-200/60 shadow-2xs';
+        case 'NOUVEAU_VU':
+            return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
+        case 'EN_COURS':
+            return 'bg-sky-50 text-sky-700 border border-sky-200/60 shadow-2xs';
+        case 'RESOLU':
+            return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs';
+        case 'FERME':
+            return 'bg-slate-100 text-slate-600 border border-slate-200/60 shadow-2xs';
+        default:
+            return 'bg-slate-100 text-slate-700';
     }
 };
 
 const getPriorityBadge = (priorite) => {
     switch (priorite) {
-        case 'URGENTE': return 'bg-red-50 text-red-700 font-bold border border-red-200/60 shadow-2xs animate-pulse';
-        case 'HAUTE': return 'bg-orange-50 text-orange-700 border border-orange-200/60 shadow-2xs';
-        case 'MOYENNE': return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
-        case 'BASSE': return 'bg-slate-50 text-slate-600 border border-slate-200/60 shadow-2xs';
-        default: return 'bg-slate-100 text-slate-700';
+        case 'URGENTE':
+            return 'bg-red-50 text-red-700 font-bold border border-red-200/60 shadow-2xs animate-pulse';
+        case 'HAUTE':
+            return 'bg-orange-50 text-orange-700 border border-orange-200/60 shadow-2xs';
+        case 'MOYENNE':
+            return 'bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs';
+        case 'BASSE':
+            return 'bg-slate-50 text-slate-600 border border-slate-200/60 shadow-2xs';
+        default:
+            return 'bg-slate-100 text-slate-700';
     }
 };
 
 export default function EmployeeDashboard() {
-    const languageHook = useLanguage();
-    const t = languageHook?.t || ((key) => key);
-    const formatId = languageHook?.formatId || ((id) => id);
-
+    const { t, formatId } = useLanguage();
     const [tickets, setTickets] = useState([]);
     const [centers, setCenters] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
@@ -206,24 +227,16 @@ export default function EmployeeDashboard() {
 
     const navigate = useNavigate();
 
-<<<<<<< HEAD
-    const getCenterName = useCallback((input) => {
-        if (!input) return '';
-=======
     // Enhanced center name resolver matching against fetched centers list or user object
     const getCenterName = useCallback((input) => {
         if (!input) return '';
 
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
         if (typeof input === 'object') {
             const directName = input.nom || input.libelle || input.name || input.title || input.ville || input.centerName;
             if (directName && directName.toLowerCase() !== 'ufc') {
                 return directName;
             }
-<<<<<<< HEAD
-=======
             
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             const nested = input.centre || input.center || input.employe?.centre || input.employe?.center;
             if (nested) {
                 if (typeof nested === 'object') {
@@ -234,22 +247,12 @@ export default function EmployeeDashboard() {
                     if (match) return match.nom || match.libelle || match.name || match.ville;
                 }
             }
-<<<<<<< HEAD
-=======
 
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             const centerIdVal = input.centreId || input.centerId || input.centre_id || input.center_id || input.id;
             if (centers.length > 0 && centerIdVal) {
                 const found = centers.find(c => String(c.id || c._id) === String(centerIdVal));
                 if (found) return found.nom || found.libelle || found.name || found.ville;
             }
-<<<<<<< HEAD
-        }
-        if (centers.length > 0) {
-            const foundById = centers.find(c => String(c.id || c._id) === String(input));
-            if (foundById) return foundById.nom || foundById.libelle || foundById.name || foundById.ville;
-        }
-=======
         }
 
         if (centers.length > 0) {
@@ -257,7 +260,6 @@ export default function EmployeeDashboard() {
             if (foundById) return foundById.nom || foundById.libelle || foundById.name || foundById.ville;
         }
 
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
         return typeof input === 'string' ? input : '';
     }, [centers]);
 
@@ -273,8 +275,12 @@ export default function EmployeeDashboard() {
                     centerRes = await api.get('/api/centers');
                 }
             }
+
             const rawData = centerRes?.data;
-            const centerList = Array.isArray(rawData) ? rawData : (rawData?.data || rawData?.centers || rawData?.centres || rawData?.list || []);
+            const centerList = Array.isArray(rawData) 
+                ? rawData 
+                : (rawData?.data || rawData?.centers || rawData?.centres || rawData?.list || []);
+            
             setCenters(Array.isArray(centerList) ? centerList : []);
         } catch (err) {
             console.error("Error fetching centers:", err);
@@ -292,22 +298,20 @@ export default function EmployeeDashboard() {
 
         try {
             const ticketRes = await api.get('/tickets');
-<<<<<<< HEAD
-            const ticketData = ticketRes.data?.data || ticketRes.data;
-            setTickets(Array.isArray(ticketData) ? ticketData : []);
-        } catch (err) {
-            console.error("Error fetching tickets:", err);
-            setTickets([]);
-=======
             setTickets(ticketRes.data.data || ticketRes.data || []);
         } catch (err) {
             console.error("Error fetching tickets:", err);
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
         }
     }, []);
 
     useEffect(() => {
-        fetchData();
+        let isMounted = true;
+        const load = async () => {
+            await fetchData();
+            if (!isMounted) return;
+        };
+        load();
+        return () => { isMounted = false; };
     }, [fetchData]);
 
     useEffect(() => {
@@ -317,8 +321,7 @@ export default function EmployeeDashboard() {
         }
         api.get(`/tickets/${selectedTicket.id}/commentaires`)
             .then(res => {
-                const commentsData = res.data?.data || res.data;
-                setTicketComments(Array.isArray(commentsData) ? commentsData : []);
+                setTicketComments(res.data.data || res.data || []);
             })
             .catch(() => {
                 setTicketComments([]);
@@ -343,19 +346,18 @@ export default function EmployeeDashboard() {
             formData.append('titre', titre);
             formData.append('description', description);
             formData.append('priorite', priorite);
-<<<<<<< HEAD
-=======
             if (resolvedCenterId) {
                 formData.append('centerId', resolvedCenterId);
             }
->>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
 
             if (fichierJoint) {
                 formData.append('fichier', fichierJoint);
             }
 
             await api.post('/tickets', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
             });
 
             setSuccessMsg(t('successTicketCreated') || 'Ticket created successfully.');
@@ -392,10 +394,8 @@ export default function EmployeeDashboard() {
                 texte: newComment 
             });
 
-            const addedComment = res.data?.data || res.data;
-            if (addedComment) {
-                setTicketComments(prev => [...prev, addedComment]);
-            }
+            const addedComment = res.data.data || res.data;
+            setTicketComments(prev => [...prev, addedComment]);
             setNewComment('');
         } catch (err) {
             console.error("Erreur lors de l'envoi du commentaire:", err.response?.data || err.message);
@@ -437,13 +437,14 @@ export default function EmployeeDashboard() {
         navigate('/login');
     };
 
-    const filteredTickets = Array.isArray(tickets) ? tickets.filter(ticket => {
+    const filteredTickets = tickets.filter(ticket => {
         const matchesSearch =
-            (ticket.titre && ticket.titre.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (ticket.id && ticket.id.toString().includes(searchTerm));
+            ticket.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ticket.id?.toString().includes(searchTerm);
         const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
+
         return matchesSearch && matchesStatus;
-    }) : [];
+    });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
@@ -738,6 +739,7 @@ export default function EmployeeDashboard() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         
+                        {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <span className="text-xs font-mono font-bold text-gray-400">#{formatId(selectedTicket.id)}</span>
                             <button 
@@ -748,6 +750,7 @@ export default function EmployeeDashboard() {
                             </button>
                         </div>
 
+                        {/* Modal Content */}
                         <div className="p-6 overflow-y-auto space-y-6 flex-1">
                             <h2 className="text-xl font-bold text-gray-900">{selectedTicket.titre}</h2>
 
@@ -794,7 +797,7 @@ export default function EmployeeDashboard() {
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{t('comments') || 'Comments'}</h3>
                                 
                                 <div className="space-y-3">
-                                    {Array.isArray(ticketComments) && ticketComments.map((comment, idx) => (
+                                    {ticketComments.map((comment, idx) => (
                                         <div key={comment.id || idx} className="bg-gray-50 border border-gray-100 p-4 rounded-2xl space-y-1">
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="font-semibold text-gray-800">
@@ -807,7 +810,7 @@ export default function EmployeeDashboard() {
                                             <p className="text-sm text-gray-700">{comment.contenu || comment.texte || comment.content}</p>
                                         </div>
                                     ))}
-                                    {(!Array.isArray(ticketComments) || ticketComments.length === 0) && (
+                                    {ticketComments.length === 0 && (
                                         <p className="text-xs text-gray-400 italic">{t('noComments') || 'No comments yet.'}</p>
                                     )}
                                 </div>
@@ -830,6 +833,7 @@ export default function EmployeeDashboard() {
                             </div>
                         </div>
 
+                        {/* Modal Footer */}
                         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
                             {selectedTicket.statut !== 'FERME' && (
                                 <button
