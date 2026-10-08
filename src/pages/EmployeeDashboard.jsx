@@ -265,16 +265,7 @@ export default function EmployeeDashboard() {
 
     const fetchData = useCallback(async () => {
         try {
-            let centerRes;
-            try {
-                centerRes = await api.get('/centers');
-            } catch {
-                try {
-                    centerRes = await api.get('/centres');
-                } catch {
-                    centerRes = await api.get('/api/centers');
-                }
-            }
+            const centerRes = await api.get('/centers');
 
             const rawData = centerRes?.data;
             const centerList = Array.isArray(rawData) 
