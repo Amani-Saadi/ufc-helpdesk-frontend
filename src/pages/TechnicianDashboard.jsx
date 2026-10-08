@@ -947,7 +947,11 @@ export default function TechnicianDashboard() {
                                         ticketComments.map((comment, idx) => (
                                             <div key={comment.id || idx} className="bg-gray-50 border border-gray-100 rounded-2xl p-3.5 text-xs space-y-1">
                                                 <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium">
+<<<<<<< HEAD
                                                     <span>{comment.auteur?.prenom && comment.auteur?.nom ? `${comment.auteur.prenom} ${comment.auteur.nom}` : (comment.auteur?.nom || comment.auteur?.email || 'Utilisateur')}</span>
+=======
+                                                    <span>{comment.employe?.nom || comment.utilisateur?.nom || comment.auteur || 'Utilisateur'}</span>
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                                                     <span>{new Date(comment.createdAt || comment.dateCreation || Date.now()).toLocaleString()}</span>
                                                 </div>
                                                 <p className="text-gray-800">{comment.contenu || comment.texte}</p>

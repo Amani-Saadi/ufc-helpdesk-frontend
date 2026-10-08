@@ -15,6 +15,17 @@ const getAuthHeader = () => {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 };
 
+<<<<<<< HEAD
+=======
+// Local calendar day as YYYY-MM-DD (so "today" matches the admin's clock, not UTC)
+const toLocalDay = (value) => {
+  const d = new Date(value);
+  if (isNaN(d)) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
 // Average response time (ms) for ALL tickets in a list.
 // Resolved/closed tickets use creation -> resolution/closure.
 // Open tickets use creation -> now, so every technician always has a value.
@@ -219,6 +230,10 @@ export default function AdminDashboard() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const [selectedTech, setSelectedTech] = useState(null);
+<<<<<<< HEAD
+=======
+  const [selectedDay, setSelectedDay] = useState(() => toLocalDay(new Date()));
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
   const [selectedCenterDetail, setSelectedCenterDetail] = useState(null);
   const [selectedCenterToAdd, setSelectedCenterToAdd] = useState('');
   const [newCenterForm, setNewCenterForm] = useState({ nom: '', codeBureau: '' });
@@ -277,6 +292,7 @@ export default function AdminDashboard() {
     return translated !== trimmedKey ? translated : trimmedKey;
   }, [t]);
 
+<<<<<<< HEAD
   // Does this ticket belong to the given center? Checks every place the backend
   // may put the center (object, id fields, creator's center) and compares by id,
   // name or code, so it works whatever shape the ticket payload has.
@@ -309,6 +325,8 @@ export default function AdminDashboard() {
     });
   }, []);
 
+=======
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
   const fetchData = useCallback(async (isMounted = { current: true }) => {
     try {
       const authHeader = getAuthHeader();
@@ -569,6 +587,7 @@ export default function AdminDashboard() {
     const pendingCount = assignedTickets.filter(tItem => tItem.statut !== 'RESOLU' && tItem.statut !== 'FERME').length;
 
     // Technician-level response KPI: average response time across all resolved/closed
+<<<<<<< HEAD
     // tickets assigned to this technician.
     const overallStats = computeDayStats(assignedTickets);
 
@@ -578,6 +597,98 @@ export default function AdminDashboard() {
   const centerTickets = selectedCenterDetail
     ? tickets.filter(tItem => ticketBelongsToCenter(tItem, selectedCenterDetail))
     : [];
+
+  const filteredTickets = tickets.filter(ticket => {
+    const matchesSearch =
+      ticket.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.id?.toString().includes(searchTerm) ||
+      getCenterName(ticket).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || ticket.statut === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 p-6 md:p-10 font-sans text-gray-800">
+      <div className="max-w-6xl mx-auto space-y-8">
+
+        {/* Header */}
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-t-4 border-t-blue-600 border-x border-b border-blue-100 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-white border border-blue-200 rounded-2xl flex items-center justify-center shadow-md p-1 overflow-hidden">
+              <img src={logoUfc} alt="Logo UFC" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold tracking-wider text-blue-700 uppercase bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                  {t('adminSpace') || 'Espace Administrateur'}
+                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <h1 className="text-2xl font-extrabold text-gray-900 mt-1">{t('adminDashboardTitle')}</h1>
+              <p className="text-sm text-gray-500">{t('adminDashboardSubtitle')}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <LanguageSwitcher />
+            <button
+              onClick={() => setShowPasswordModal(true)}
+              className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 p-2.5 rounded-2xl transition-all shadow-sm hover:shadow cursor-pointer flex items-center justify-center"
+              title={t('changePassword') || 'Modifier mon mot de passe'}
+            >
+              🔑
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-white hover:bg-red-50 text-red-600 border border-red-200 font-medium px-4 py-2.5 rounded-2xl text-sm transition-all shadow-sm hover:shadow cursor-pointer flex items-center gap-2"
+            >
+              {t('logout')}
+            </button>
+          </div>
+        </div>
+
+        {errorMsg && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-medium shadow-sm">{errorMsg}</div>}
+
+        {/* Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-blue-600 border-r border-y border-blue-100 shadow-xl">
+            <div className="text-blue-600 text-xs font-bold uppercase tracking-wider">{t('totalTickets')}</div>
+            <div className="text-3xl font-black text-gray-900 mt-2">{tickets.length}</div>
+          </div>
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-sky-600 border-r border-y border-blue-100 shadow-xl">
+            <div className="text-sky-600 text-xs font-bold uppercase tracking-wider">{t('techniciansCount') || 'Techniciens Actifs'}</div>
+            <div className="text-3xl font-black text-sky-600 mt-2">{technicians.length}</div>
+          </div>
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 border-l-4 border-l-emerald-500 border-r border-y border-blue-100 shadow-xl">
+            <div className="text-emerald-600 text-xs font-bold uppercase tracking-wider">{t('resolvedTickets')}</div>
+            <div className="text-3xl font-black text-emerald-600 mt-2">
+              {tickets.filter(tItem => tItem.statut === 'RESOLU' || tItem.statut === 'FERME').length}
+            </div>
+          </div>
+        </div>
+
+        {/* ADMIN NAVIGATION BUTTONS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => setShowTechStats(prev => !prev)}
+            className={`p-5 rounded-3xl border transition-all shadow-lg flex items-center justify-between cursor-pointer ${showTechStats ? 'bg-sky-600 text-white border-sky-500 shadow-sky-600/30' : 'bg-white/95 text-gray-800 border-sky-100 hover:bg-sky-50/50'}`}
+          >
+            <div className="text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-80 block">{t('section01')}</span>
+              <h3 className="text-md font-bold mt-0.5">🛠️ {t('techsButtonTitle') || 'Gestion Techniciens'}</h3>
+              <p className="text-xs opacity-80 mt-1">{technicians.length} {t('techniciansRegistered') || 'techniciens'}</p>
+            </div>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-xl ${showTechStats ? 'bg-white/20 text-white' : 'bg-sky-50 text-sky-700'}`}>
+              {showTechStats ? (t('active') || 'Actif') : (t('show') || 'Afficher')}
+=======
+    // tickets assigned to this technician. The selected-day KPI remains available in
+    // the technician details modal.
+    const overallStats = computeDayStats(assignedTickets);
+    const dayStats = computeDayStats(assignedTickets.filter(tItem => toLocalDay(tItem.dateCreation || tItem.createdAt) === selectedDay));
+
+    return { ...tech, totalAssigned: assignedTickets.length, resolvedCount, pendingCount, overallStats, dayStats };
+  });
 
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch =
@@ -676,10 +787,28 @@ export default function AdminDashboard() {
             </div>
             <span className={`text-xs font-bold px-3 py-1.5 rounded-xl ${showCentersSection ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700'}`}>
               {showCentersSection ? (t('active') || 'Actif') : (t('show') || 'Afficher')}
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             </span>
           </button>
 
           <button
+<<<<<<< HEAD
+            onClick={() => setShowCentersSection(prev => !prev)}
+            className={`p-5 rounded-3xl border transition-all shadow-lg flex items-center justify-between cursor-pointer ${showCentersSection ? 'bg-amber-600 text-white border-amber-500 shadow-amber-600/30' : 'bg-white/95 text-gray-800 border-amber-100 hover:bg-amber-50/50'}`}
+          >
+            <div className="text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-80 block">{t('section02')}</span>
+              <h3 className="text-md font-bold mt-0.5">🏢 {t('centersButtonTitle') || 'Gestion Centres'}</h3>
+              <p className="text-xs opacity-80 mt-1">{centers.length} {t('centersRegistered') || 'centres'}</p>
+            </div>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-xl ${showCentersSection ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700'}`}>
+              {showCentersSection ? (t('active') || 'Actif') : (t('show') || 'Afficher')}
+            </span>
+          </button>
+
+          <button
+=======
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
             onClick={() => setShowCreateModal(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white p-5 rounded-3xl border border-emerald-500 shadow-lg shadow-emerald-600/30 flex items-center justify-between transition-all cursor-pointer"
           >
@@ -703,6 +832,23 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-400">{t('techPerformanceSubtitle') || "Cliquez sur un technicien pour gérer ses centres, ses temps de réponse et son mot de passe"}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+<<<<<<< HEAD
+=======
+                <label className="text-xs font-semibold text-gray-500">{t('day') || 'Jour'}</label>
+                <input
+                  type="date"
+                  value={selectedDay}
+                  max={toLocalDay(new Date())}
+                  onChange={(e) => e.target.value && setSelectedDay(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-800 outline-none cursor-pointer"
+                />
+                <button
+                  onClick={() => setSelectedDay(toLocalDay(new Date()))}
+                  className="text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl hover:bg-sky-100 cursor-pointer"
+                >
+                  {t('today') || "Aujourd'hui"}
+                </button>
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                 <span className="text-xs bg-sky-50 text-sky-800 font-semibold px-3 py-1.5 rounded-full border border-sky-200">
                   {technicians.length} {t('techniciansRegistered') || 'techniciens enregistrés'}
                 </span>
@@ -847,7 +993,10 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {centers.map((center, idx) => {
                     const isActive = center.statutActif !== undefined ? center.statutActif : true;
+<<<<<<< HEAD
                     const createdCount = tickets.filter(tk => ticketBelongsToCenter(tk, center)).length || center.totalTickets || 0;
+=======
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                     
                     const assignedTech = technicians.find(tech => (tech.centres || []).some(c => String(c.id) === String(center.id || center._id)));
 
@@ -879,7 +1028,11 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-4 text-center">
                           <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+<<<<<<< HEAD
                             {createdCount}
+=======
+                            {center.totalTickets || 0}
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                           </span>
                         </td>
                         <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -1205,6 +1358,20 @@ export default function AdminDashboard() {
               {/* TICKETS & RESPONSE TIME */}
               <div>
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t('assignedTicketsAndTime') || 'Tickets assignés & Temps de réponse'}</h4>
+<<<<<<< HEAD
+=======
+                {(() => {
+                  const day = computeDayStats(tickets.filter(tk =>
+                    String(tk.technicienId || tk.technicianId || tk.technicien?.id || tk.technician?.id) === String(selectedTech.id || selectedTech._id) &&
+                    toLocalDay(tk.dateCreation || tk.createdAt) === selectedDay));
+                  return (
+                    <div className="mb-3 p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-xs text-emerald-900 flex justify-between items-center">
+                      <span>📅 {selectedDay} — {day.resolved}/{day.total} {t('resolvedShort') || 'résolus ce jour'}</span>
+                      <span className={`font-mono font-bold ${day.avgMs > RESPONSE_LIMIT_MS ? 'text-red-600' : ''}`}>{day.avgMs > RESPONSE_LIMIT_MS ? '⚠️' : '⏱️'} {day.avgFormatted || '--'}</span>
+                    </div>
+                  );
+                })()}
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {tickets.filter(tItem => String(tItem.technicienId || tItem.technicianId || tItem.technicien?.id || tItem.technician?.id) === String(selectedTech.id || selectedTech._id)).map(ticket => {
                     return (
@@ -1271,10 +1438,17 @@ export default function AdminDashboard() {
               </div>
 
               <div>
+<<<<<<< HEAD
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t('ticketsCreatedByCenter') || 'Tickets émis par ce centre'} ({centerTickets.length})</h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {centerTickets.map(ticket => (
                     <div key={ticket.id || ticket._id} onClick={() => { setSelectedCenterDetail(null); setSelectedTicket(ticket); }} className="p-3 bg-gray-50 hover:bg-blue-50/40 rounded-xl border border-gray-100 flex justify-between items-center text-xs cursor-pointer transition-colors">
+=======
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t('ticketsCreatedByCenter') || 'Tickets émis par ce centre'}</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {tickets.filter(tItem => getCenterName(tItem) === selectedCenterDetail.nom || String(tItem.centreId || tItem.centerId) === String(selectedCenterDetail.id || selectedCenterDetail._id)).map(ticket => (
+                    <div key={ticket.id || ticket._id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center text-xs">
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                       <div>
                         <span className="font-bold text-gray-800">#{formatId(ticket.id)} - {ticket.titre}</span>
                       </div>
@@ -1283,7 +1457,11 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                   ))}
+<<<<<<< HEAD
                   {centerTickets.length === 0 && (
+=======
+                  {tickets.filter(tItem => getCenterName(tItem) === selectedCenterDetail.nom || String(tItem.centreId || tItem.centerId) === String(selectedCenterDetail.id || selectedCenterDetail._id)).length === 0 && (
+>>>>>>> 61058dfd1d2917519c20e1a23674f6f04502e837
                     <p className="text-xs text-gray-400 italic text-center py-4">{t('noTicketsForCenter') || 'Aucun ticket enregistré pour ce centre.'}</p>
                   )}
                 </div>
